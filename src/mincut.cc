@@ -15,10 +15,10 @@
 
 /*
 GAP Benchmark Suite
-Kernel: Triangle Counting (TC)
-Author: Scott Beamer
+Kernel: MinCut
+Author: Henry Trinh
 
-Will count the number of triangles (cliques of size 3)
+Will output mincut
 
 Requires input graph:
   - to be undirected
@@ -28,34 +28,115 @@ Requires input graph:
 Other than symmetrizing, the rest of the requirements are done by SquishCSR
 during graph building.
 
-This implementation reduces the search space by counting each triangle only
-once. A naive implementation will count the same triangle six times because
-each of the three vertices (u, v, w) will count it in both ways. To count
-a triangle only once, this implementation only counts a triangle if u > v > w.
-Once the remaining unexamined neighbors identifiers get too big, it can break
-out of the loop, but this requires that the neighbors to be sorted.
-
-Another optimization this implementation has is to relabel the vertices by
-degree. This is beneficial if the average degree is high enough and if the
-degree distribution is sufficiently non-uniform. To decide whether or not
-to relabel the graph, we use the heuristic in WorthRelabelling.
 */
 
 using namespace std;
+typedef EdgePair<NodeID, WNode> WEdge;
 
-class spanTree
+template <class = NodeID>
+// class MinSpanTree
+// {
+// private:
+//     pvector<NodeID> parent;
+//     pvector<NodeID> size; //size of subtree rooted with pvector[i]
+//     pvector<NodeID> chain;
+//     // some edgelist here also
+// public:
+// };
+
+int find(int *parent, int i)
 {
-private:
-    pvector<NodeID> parent;
-    pvector<NodeID> depth; //useful when walking up the tree to find LCA for path decomposition
-    pvector<NodeID> size;  //size of subtree rooted with pvector[i]
-    pvector<NodeID> chain;
-};
+    int root = i;
+    while (root != parent[root])
+        root = parent[root];
+    //path compression
+    while (i != root)
+    {
+        int newi = parent[i];
+        parent[i] = root;
+        i = newi;
+    }
+    return root;
+}
+
+void Union(int *parent, int *size, int x, int y)
+{
+    //union by size
+    if (size[x] < size[y])
+    {
+        parent[x] = y;
+        size[y] += size[x];
+    }
+    else
+    {
+        parent[y] = x;
+        size[x] += size[y];
+    }
+}
+
+pvector<WEdge> Kruskal(const WGraph &g)
+{
+    pvector<WEdge> WEdgelist(g.num_edges());
+    int j = 0;
+    for (NodeID u : g.vertices())
+    {
+        for (WNode wn : g.out_neigh(u))
+        {
+            //since g.vertices and g.out_neigh give us sorted NodeID, with u < wn.v we don't account edges twice
+            if (u < wn.v)
+            {
+                WEdgelist[j] = WEdge(u, wn);
+                j++;
+            }
+        }
+    }
+    // less function for sorting WEdgelist
+    auto lessWEdge = [](WEdge const &l, WEdge const &r) {
+        return l.v.w < r.v.w;
+    };
+
+    sort(WEdgelist.begin(), WEdgelist.end(), lessWEdge);
+    //edges from span tree
+    pvector<WEdge> tree_WEdgelist(g.num_nodes() - 1);
+    int *parent = new int[g.num_nodes()];
+    int *size = new int[g.num_nodes()];
+    for (int i = 0; i < g.num_nodes(); i++)
+    {
+        parent[i] = i;
+        size[i] = 1;
+    }
+
+    int tree_edges = 0;
+    // current edge from graph
+    int i = 0;
+    // cout << WEdgelist[i].u << " " << WEdgelist[i].v.v << " " << WEdgelist[i].v.w << endl;
+    while (tree_edges < g.num_nodes() - 1)
+    {
+        WEdge next_edge = WEdgelist[i];
+        int x = find(parent, next_edge.u);
+        int y = find(parent, next_edge.v.v);
+        if (x != y)
+        {
+            tree_WEdgelist[tree_edges] = next_edge;
+            Union(parent, size, x, y);
+            tree_edges++;
+        }
+        i++;
+    }
+    for (auto i : tree_WEdgelist)
+        cout << "Edges " << i.u << " " << i.v.v << " " << i.v.w << endl;
+
+    delete[] parent;
+    delete[] size;
+
+    cout << "#treeEdges: " << tree_edges << " " << endl;
+    return tree_WEdgelist;
+}
 
 size_t MinCut(const WGraph &g)
 {
-
-    return (size_t)0;
+    auto tree = Kruskal(g);
+    return 0;
 }
 
 void PrintMinCutValue(const WGraph &g, size_t min_cut_value)
@@ -67,15 +148,21 @@ void PrintMinCutValue(const WGraph &g, size_t min_cut_value)
 bool MINCUTVerifier(const WGraph &g, size_t test_min)
 {
     int n = g.num_nodes();
-    // int edges[n][n];
-    int edges[n][n], v[n], dis[n], vis[n];
-    memset(edges, 0, sizeof edges);
+    pvector<int> edges(n * n, 0);
+    //
+    int v[n], dis[n], vis[n];
+    //construct edges in matrix form
     for (NodeID u : g.vertices())
     {
+        if (g.out_degree(u) == 0)
+        {
+            cout << u << " has no neighbors" << endl;
+            return false;
+        }
         for (WNode wn : g.out_neigh(u))
         {
-            edges[u][wn.v] = wn.w;
-            edges[wn.v][u] = wn.w;
+            edges[u * n + wn.v] = wn.w;
+            edges[wn.v * n + u] = wn.w;
         }
     }
 
@@ -86,26 +173,28 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
         vis[i] = 0;
     }
     int n_ = n - 1;
-    while (n_ > 1)
+    //loop until only 2 nodes left,
+    while (n_ > 0)
     {
+        //last and second last node, we start with node 1 and 0
         int p = 1, prev = 0;
-        for (int i = 1; i < n; i++)
+        for (int i = 0; i <= n_; i++)
         {
-            dis[v[i]] = edges[v[0]][v[i]];
+            dis[v[i]] = edges[v[0] * n + v[i]];
             if (dis[v[i]] > dis[v[p]])
                 p = i;
         }
         vis[v[0]] = n_;
-        for (int i = 1; i < n; i++)
+        for (int i = 1; i <= n_; i++)
         {
             if (i == n_)
             {
                 mincut = min<size_t>(mincut, dis[v[p]]);
                 //contract edges from p and prev
-                for (int j = 0; j < n; j++)
+                for (int j = 0; j <= n_; j++)
                 {
-                    edges[v[prev]][v[j]] += edges[v[p]][v[j]];
-                    edges[v[j]][v[prev]] = edges[v[prev]][v[j]];
+                    edges[v[prev] * n + v[j]] += edges[v[p] * n + v[j]];
+                    edges[v[j] * n + v[prev]] = edges[v[prev] * n + v[j]];
                 }
                 v[p] = v[n_--];
                 break;
@@ -113,11 +202,12 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
             vis[v[p]] = n_;
             prev = p;
             p = -1;
-            for (int j = 1; j < n; j++)
+            for (int j = 1; j <= n_; j++)
             {
                 if (vis[v[j]] != n_)
                 {
-                    dis[v[j]] += edges[v[prev]][v[j]];
+                    //find most tightly connected vertex which hasn't been visited yet
+                    dis[v[j]] += edges[v[prev] * n + v[j]];
                     if (p == -1 || dis[v[p]] < dis[v[j]])
                         p = j;
                 }
@@ -136,11 +226,11 @@ int main(int argc, char *argv[])
         return -1;
     WeightedBuilder b(cli);
     WGraph g = b.MakeGraph();
+    // g.PrintTopology();
     if (g.directed())
     {
         cout << "Input graph is directed but we only consider undirected graphs" << endl;
         return -2;
     }
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
-    return 0;
 }
