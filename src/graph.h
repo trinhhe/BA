@@ -89,10 +89,7 @@ typedef int32_t SGID;
 typedef EdgePair<SGID> SGEdge;
 typedef int64_t SGOffset;
 
-// unweighted graph
 template <class NodeID_, class DestID_ = NodeID_, bool MakeInverse = true>
-//weighted graph
-// template <class NodeID_, class DestID_ = NodeWeight<NodeID_, class WeightT_>, bool MakeInverse = true>
 class CSRGraph
 {
     // Used for *non-negative* offsets within a neighborhood

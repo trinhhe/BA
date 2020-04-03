@@ -6,12 +6,14 @@
 #include <iostream>
 #include <vector>
 #include <string.h>
+#include <assert.h>
 
 #include "benchmark.h"
 #include "builder.h"
-#include "command_line.h" /*  */
+#include "command_line.h"
 #include "graph.h"
 #include "pvector.h"
+#include "spantree.h"
 
 /*
 GAP Benchmark Suite
@@ -22,7 +24,7 @@ Will output mincut
 
 Requires input graph:
   - to be undirected
-  - no duplicate edges (or else will be counted as multiple triangles)
+  - no duplicate edges 
   - neighborhoods are sorted by vertex identifiers
 
 Other than symmetrizing, the rest of the requirements are done by SquishCSR
@@ -33,23 +35,12 @@ during graph building.
 using namespace std;
 typedef EdgePair<NodeID, WNode> WEdge;
 
-template <class = NodeID>
-// class MinSpanTree
-// {
-// private:
-//     pvector<NodeID> parent;
-//     pvector<NodeID> size; //size of subtree rooted with pvector[i]
-//     pvector<NodeID> chain;
-//     // some edgelist here also
-// public:
-// };
-
-int find(int *parent, int i)
+NodeID find(int *parent, NodeID i)
 {
-    int root = i;
+    NodeID root = i;
     while (root != parent[root])
         root = parent[root];
-    //path compression
+    // path compression
     while (i != root)
     {
         int newi = parent[i];
@@ -59,7 +50,7 @@ int find(int *parent, int i)
     return root;
 }
 
-void Union(int *parent, int *size, int x, int y)
+void Union(int *parent, int *size, NodeID x, NodeID y)
 {
     //union by size
     if (size[x] < size[y])
@@ -78,11 +69,12 @@ pvector<WEdge> Kruskal(const WGraph &g)
 {
     pvector<WEdge> WEdgelist(g.num_edges());
     int j = 0;
+    // cout << "g.out_neigh(0)[1]: " << *(g.out_neigh(0).begin() + 3) << endl;
     for (NodeID u : g.vertices())
     {
         for (WNode wn : g.out_neigh(u))
         {
-            //since g.vertices and g.out_neigh give us sorted NodeID, with u < wn.v we don't account edges twice
+            //since g.vertices and g.out_neigh give us sorted NodeID, with u < wn.v we don't count edges twice
             if (u < wn.v)
             {
                 WEdgelist[j] = WEdge(u, wn);
@@ -96,9 +88,11 @@ pvector<WEdge> Kruskal(const WGraph &g)
     };
 
     sort(WEdgelist.begin(), WEdgelist.end(), lessWEdge);
-    //edges from span tree
+    //will contain edges from span tree
     pvector<WEdge> tree_WEdgelist(g.num_nodes() - 1);
+    //array to help resolving cycles
     int *parent = new int[g.num_nodes()];
+    //array to help for union by size
     int *size = new int[g.num_nodes()];
     for (int i = 0; i < g.num_nodes(); i++)
     {
@@ -109,12 +103,11 @@ pvector<WEdge> Kruskal(const WGraph &g)
     int tree_edges = 0;
     // current edge from graph
     int i = 0;
-    // cout << WEdgelist[i].u << " " << WEdgelist[i].v.v << " " << WEdgelist[i].v.w << endl;
     while (tree_edges < g.num_nodes() - 1)
     {
         WEdge next_edge = WEdgelist[i];
-        int x = find(parent, next_edge.u);
-        int y = find(parent, next_edge.v.v);
+        NodeID x = find(parent, next_edge.u);
+        NodeID y = find(parent, next_edge.v.v);
         if (x != y)
         {
             tree_WEdgelist[tree_edges] = next_edge;
@@ -123,19 +116,29 @@ pvector<WEdge> Kruskal(const WGraph &g)
         }
         i++;
     }
-    for (auto i : tree_WEdgelist)
-        cout << "Edges " << i.u << " " << i.v.v << " " << i.v.w << endl;
+    // for (auto i : tree_WEdgelist)
+    //     cout << "Edges " << i.u << " " << i.v.v << " " << i.v.w << endl;
 
     delete[] parent;
     delete[] size;
 
-    cout << "#treeEdges: " << tree_edges << " " << endl;
+    // cout << "#treeEdges: " << tree_edges << " " << endl;
     return tree_WEdgelist;
 }
 
 size_t MinCut(const WGraph &g)
 {
-    auto tree = Kruskal(g);
+    pvector<WEdge> tree_edges = Kruskal(g);
+
+    // for (auto i : vertex_degree)
+    // {
+    //     cout << i << endl;
+    // }
+
+    auto tree_graph = WeightedBuilder::Load_CSR_From_Edgelist(tree_edges, true);
+    SpanTree T(tree_graph);
+    T.print();
+    T.findparents_and_root();
     return 0;
 }
 
@@ -144,7 +147,7 @@ void PrintMinCutValue(const WGraph &g, size_t min_cut_value)
     cout << "min cut value: " << min_cut_value << endl;
 }
 
-// Compares with simple serial implementation (Stoer-Wagner)
+// Compares with simple serial implementation (Stoer-Wagner), not really efficient with n * n matrix, only for small samples for the sake of debugging
 bool MINCUTVerifier(const WGraph &g, size_t test_min)
 {
     int n = g.num_nodes();
@@ -154,11 +157,12 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
     //construct edges in matrix form
     for (NodeID u : g.vertices())
     {
-        if (g.out_degree(u) == 0)
-        {
-            cout << u << " has no neighbors" << endl;
-            return false;
-        }
+        assert(g.out_degree(u) > 0);
+        // if (g.out_degree(u) == 0)
+        // {
+        //     cout << u << " has no neighbors" << endl;
+        //     return false;
+        // }
         for (WNode wn : g.out_neigh(u))
         {
             edges[u * n + wn.v] = wn.w;
