@@ -138,7 +138,6 @@ size_t MinCut(const WGraph &g)
     auto tree_graph = WeightedBuilder::Load_CSR_From_Edgelist(tree_edges, true);
     SpanTree T(tree_graph);
     T.print();
-    T.findparents_and_root();
     return 0;
 }
 
