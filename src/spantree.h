@@ -10,6 +10,7 @@
 
 #include "graph.h"
 #include "pvector.h"
+#include "minimumpath.h"
 
 /*
 Author: Henry Trinh
@@ -26,22 +27,32 @@ typedef int32_t PathID;
 
 class SpanTree
 {
-    WGraph &g;
+    const WGraph &tree;
+    int root;
     int num_nodes;
-    int num_paths;
+    // int num_paths;
     //stores parent of a node, parent of root is -1
     pvector<NodeID> parent;
-    //contains path ID where NodeID belongs to
+    //contains path ID where NodeID belongs to (maybe not needed)
     pvector<NodeID> path_id;
-    // pvector<PathID> parent_path;
-    // pvector<PathID> child_path;
+    //path[i] = j means that j is next node of i in some path, if i is last node in chain path[i] = -1
+    pvector<NodeID> path;
+    //head[i] is the head vertex of a path which i belongs to (head vertex is closer to root of tree)
+    pvector<NodeID> head;
+    //stores position of a node in MinPath structure
+    pvector<NodeID> minpathPos;
+
+    //tree structure for all paths
+    MinimumPath P;
 
 public:
     // CONSTRUCTORS //
 
-    SpanTree(WGraph &g) : g(g), num_nodes(g.num_nodes()), parent(num_nodes, -1), path_id(num_nodes, -1)
+    SpanTree(WGraph &g) : tree(g), num_nodes(g.num_nodes()), parent(num_nodes, -1),
+                          path_id(num_nodes, -1), path(num_nodes), minpathPos(num_nodes), P(num_nodes)
     {
         PathSegmentation();
+        // num_paths = head.size();
     }
 
     ~SpanTree() { cout << "Destructor called" << endl; }
@@ -49,33 +60,38 @@ public:
     void print()
     {
         cout << "Tree Topology: " << endl;
-        g.PrintTopology();
-        cout << "parent array: " << endl;
+        tree.PrintTopology();
+        cout << "parent array, path, head and minpathPos : " << endl;
         for (int i = 0; i < num_nodes; i++)
         {
-            cout << i << " " << parent[i] << " " << path_id[i] << endl;
+            cout << i << " " << parent[i] << " " << path[i] << " " << head[i] << " " << minpathPos[i] << endl;
         }
     }
 
+    //start from leaves and go up until we hit root
     void PathSegmentation()
     {
         //temporary storage of degrees
         pvector<NodeID> vertex_degree(num_nodes);
-        //helper vector to follow down nodes on same path id
-        pvector<NodeID> childpath(num_nodes, -1);
         queue<NodeID> q;
         int v = num_nodes;
-        for (NodeID i : g.vertices())
+        PathID j = 0;
+        for (NodeID i : tree.vertices())
         {
-            vertex_degree[i] = g.out_degree(i);
+            vertex_degree[i] = tree.out_degree(i);
             //fill queue with all leaves
-            if (g.out_degree(i) == 1)
+            if (tree.out_degree(i) == 1)
             {
                 q.push(i);
+                path_id[i] = j;
+                // tail.push_back(i);
+                path[i] = -1;
+                head.push_back(i);
+                ++j;
                 --v;
             }
         }
-        PathID j = -1;
+        NodeID currentLeaf = -1;
         //loop until total vertex is less than 2
         while (v > 0)
         {
@@ -83,16 +99,10 @@ public:
             //process all leaves
             for (int i = 0; i < queue_size; i++)
             {
-                NodeID currentLeaf = q.front();
+                currentLeaf = q.front();
                 q.pop();
-                // -1 means node hasn't path id yet
-                if (path_id[currentLeaf] == -1)
-                {
-                    j++;
-                    path_id[currentLeaf] = j;
-                }
-                //decrease degree for each neighbour of currentLeaf
-                for (NodeID u : g.out_neigh(currentLeaf))
+
+                for (NodeID u : tree.out_neigh(currentLeaf))
                 {
                     //since we go from leaves to root and a node can only have one parent,
                     //the node with degree higher 1 must be the parent
@@ -101,30 +111,13 @@ public:
                         parent[currentLeaf] = u;
                     }
 
-                    if (vertex_degree[u] > 2 && path_id[u] == -1)
+                    if (vertex_degree[u] == 2 && path_id[u] == -1)
                     {
-                        j++;
-                        path_id[u] = j;
+                        path_id[u] = path_id[currentLeaf];
+                        head[path_id[currentLeaf]] = u;
+                        path[u] = currentLeaf;
                     }
-                    else if (vertex_degree[u] == 2 && path_id[u] == -1)
-                    {
-                        path_id[u] = j;
-                        childpath[u] = currentLeaf;
-                        // path_id[u] = path_id[currentLeaf];
-                    }
-                    else if (vertex_degree[u] == 2 && path_id[u] != -1)
-                    {
-                        //higher node alrdy has path id
-                        //go down and rename all children of the path id
-                        childpath[u] = currentLeaf;
-                        NodeID k = childpath[u];
-                        while (k != -1)
-                        {
-                            path_id[k] = path_id[u];
-                            k = childpath[k];
-                        }
-                    }
-
+                    //decrease degree for each neighbour of currentLeaf
                     vertex_degree[u]--;
                     //insert into queue if node becomes leaf
                     if (vertex_degree[u] == 1)
@@ -135,14 +128,60 @@ public:
                 }
             }
         }
+
+        //two possible candidates for tree root
+        if (q.size() == 2)
+        {
+            int child = q.front();
+            q.pop();
+            parent[child] = q.front();
+        }
+        root = q.front();
+        q.pop();
+
+        // add parent to last node in iteration from before
+        for (NodeID u : tree.out_neigh(root))
+            if (parent[u] == -1)
+                parent[u] = root;
+
+        //determine head vertex and minpathPos of every vertex
+        for (NodeID i = 0, currentPos = 0; i < num_nodes; i++)
+        {
+            //if i is root or start vertex of a path
+            if (parent[i] == -1 || path[parent[i]] != i)
+                for (NodeID j = i; j != -1; j = path[j])
+                {
+                    head[j] = i;
+                    minpathPos[j] = currentPos++;
+                }
+        }
+    }
+    //function that will fill the minpath leaves with the corresponding initial weight (Karger, smallest cut that 1-respects given tree)
+    void set(NodeID v, const int &value)
+    {
+        P.set(minpathPos[v], value);
     }
 
-    void MinPath()
+    int MinPath(NodeID v)
     {
+        int res = numeric_limits<int>::max();
+        //go through all paths until we hit the root of spantree
+        for (; head[v] != root; v = parent[head[v]])
+        {
+            res = min(res, P.minprefix(minpathPos[v]));
+        }
+        res = min(res, P.minprefix(minpathPos[v]));
+        return res;
     }
 
-    void AddPath()
+    void AddPath(NodeID v, const int &value)
     {
+        //go through all paths until we hit the root of spantree
+        for (; head[v] != root; v = parent[head[v]])
+        {
+            P.addprefix(minpathPos[v], value);
+        }
+        P.addprefix(minpathPos[v], value);
     }
 };
 #endif
