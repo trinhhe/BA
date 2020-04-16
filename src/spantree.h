@@ -168,9 +168,9 @@ public:
         //go through all paths until we hit the root of spantree
         for (; head[v] != root; v = parent[head[v]])
         {
-            res = min(res, P.minprefix(minpathPos[v]));
+            res = min(res, P.minprefix(minpathPos[head[v]], minpathPos[v]));
         }
-        res = min(res, P.minprefix(minpathPos[v]));
+        res = min(res, P.minprefix(minpathPos[root], minpathPos[v]));
         return res;
     }
 
@@ -179,9 +179,9 @@ public:
         //go through all paths until we hit the root of spantree
         for (; head[v] != root; v = parent[head[v]])
         {
-            P.addprefix(minpathPos[v], value);
+            P.addprefix(minpathPos[head[v]], minpathPos[v], value);
         }
-        P.addprefix(minpathPos[v], value);
+        P.addprefix(minpathPos[root], minpathPos[v], value);
     }
 };
 #endif

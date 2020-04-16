@@ -33,12 +33,12 @@ public:
     {
     }
 
-    int minprefix(NodeID v)
+    int minprefix(NodeID startnode, NodeID lastnode)
     {
         return 0;
     }
 
-    void addprefix(NodeID v, const int &value)
+    void addprefix(NodeID startnode, NodeID lastnode, const int &value)
     {
     }
 };
