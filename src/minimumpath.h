@@ -26,11 +26,15 @@ public:
     //function to fill up leaves of MinPath
     void set(int v, const int &value)
     {
+        tree[num_nodes + v] = value;
     }
 
     //initialize minpath stucture with given leave values
     void build()
     {
+        for (int i = num_nodes - 1; i > 0; i--)
+        {
+                }
     }
 
     int minprefix(NodeID startnode, NodeID lastnode)

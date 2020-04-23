@@ -128,6 +128,7 @@ pvector<WEdge> Kruskal(const WGraph &g)
 
 size_t MinCut(const WGraph &g)
 {
+    assert(g.num_edges() > 0);
     pvector<WEdge> tree_edges = Kruskal(g);
 
     // for (auto i : vertex_degree)
