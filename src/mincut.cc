@@ -14,6 +14,7 @@
 #include "graph.h"
 #include "pvector.h"
 #include "spantree.h"
+#include "minimumpath.h"
 
 /*
 GAP Benchmark Suite
@@ -74,6 +75,7 @@ pvector<WEdge> Kruskal(const WGraph &g)
     {
         for (WNode wn : g.out_neigh(u))
         {
+            assert(wn.w > 0);
             //since g.vertices and g.out_neigh give us sorted NodeID, with u < wn.v we don't count edges twice
             if (u < wn.v)
             {
@@ -131,13 +133,15 @@ size_t MinCut(const WGraph &g)
     assert(g.num_edges() > 0);
     pvector<WEdge> tree_edges = Kruskal(g);
 
-    // for (auto i : vertex_degree)
-    // {
-    //     cout << i << endl;
-    // }
-
     auto tree_graph = WeightedBuilder::Load_CSR_From_Edgelist(tree_edges, true);
-    SpanTree T(tree_graph);
+    SpanTree T(g, tree_graph);
+    // for (int i = 0; i < 8; i++)
+    // {
+    //     T.set(i, i);
+    // }
+    // T.build();
+    // T.AddPath(2, 3);
+    T.InitializeWeight();
     T.print();
     return 0;
 }
@@ -223,6 +227,40 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
     return mincut == test_min;
 }
 
+void dfs(WGraph &g, int v, pvector<bool> &visited)
+{
+    // visited[v] = true;
+    // for (auto i : g.out_neigh(v))
+    // {
+    //     if (!visited[i])
+    //         dfs(g, i, visited);
+    // }
+    stack<int> st;
+    st.push(v);
+    while (!st.empty())
+    {
+        auto s = st.top();
+        st.pop();
+        if (!visited[s])
+            visited[s] = true;
+        for (auto i : g.out_neigh(s))
+        {
+            if (!visited[i])
+                st.push(i);
+        }
+    }
+}
+
+bool isConnected(WGraph &g)
+{
+    pvector<bool> visited(g.num_nodes(), false);
+    dfs(g, 0, visited);
+    for (int i : visited)
+        if (!i)
+            return false;
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     CLApp cli(argc, argv, "mincut");
@@ -230,10 +268,15 @@ int main(int argc, char *argv[])
         return -1;
     WeightedBuilder b(cli);
     WGraph g = b.MakeGraph();
-    // g.PrintTopology();
+    g.PrintTopology();
     if (g.directed())
     {
         cout << "Input graph is directed but we only consider undirected graphs" << endl;
+        return -2;
+    }
+    if (!isConnected(g))
+    {
+        cout << "Input graph is not connected" << endl;
         return -2;
     }
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);

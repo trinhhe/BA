@@ -7,6 +7,9 @@
 #include <string.h>
 #include <assert.h>
 #include <queue>
+#include <stack>
+#include <unordered_map>
+// #include <typeinfo>
 
 #include "graph.h"
 #include "pvector.h"
@@ -27,6 +30,7 @@ typedef int32_t PathID;
 
 class SpanTree
 {
+    const WGraph &graph;
     const WGraph &tree;
     int root;
     int num_nodes;
@@ -41,33 +45,54 @@ class SpanTree
     pvector<NodeID> head;
     //stores position of a node in MinPath structure
     pvector<NodeID> minpathPos;
+    //length of paths
+    pvector<PathID> lengths;
 
-    //tree structure for all paths
-    pvector<MinimumPath> P;
+    //pointers to all minpath structures of the spantree
+    pvector<MinimumPath *> P;
 
 public:
     // CONSTRUCTORS //
 
-    SpanTree(WGraph &g) : tree(g), num_nodes(g.num_nodes()), num_paths(0), parent(num_nodes, -1),
-                          path_id(num_nodes, -1), path(num_nodes), head(num_nodes), minpathPos(num_nodes)
+    SpanTree(const WGraph &G, const WGraph &T) : graph(G), tree(T), num_nodes(G.num_nodes()), num_paths(0), parent(num_nodes, -1),
+                                                 path_id(num_nodes, -1), path(num_nodes), head(num_nodes), minpathPos(num_nodes)
     {
         PathSegmentation();
-        // num_paths = head.size();
+        P.reserve(num_paths);
+        for (int i = 0; i < num_paths; i++)
+        {
+            P.push_back(new MinimumPath(lengths[i]));
+        }
     }
 
-    ~SpanTree() { cout << "Destructor called" << endl; }
+    ~SpanTree()
+    {
+        for (auto p : P)
+            delete p;
+        P.clear();
+        cout << "Destructor called" << endl;
+    }
 
     void print()
     {
+        cout << "------------------------------------------" << endl;
         cout << "Tree Topology: " << endl;
         tree.PrintTopology();
-        cout << "parent, path, path_id, head: " << endl;
+        cout << "parent, path, path_id, head, minpathPos: " << endl;
         for (int i = 0; i < num_nodes; i++)
         {
-            cout << i << " " << parent[i] << " " << path[i] << " " << path_id[i] << " " << head[i] << endl;
+            cout << i << " " << parent[i] << " " << path[i] << " " << path_id[i] << " " << head[i] << " " << minpathPos[i] << endl;
         }
         cout << "num_paths: " << num_paths << endl;
         cout << "root: " << root << endl;
+        cout << "P: " << endl;
+        int j = 0;
+        for (auto i : P)
+        {
+            cout << "Path ID: " << j++ << endl;
+            i->print();
+        }
+        cout << "------------------------------------------" << endl;
     }
 
     //function to trace a path until we hit a branching node
@@ -179,48 +204,313 @@ public:
         // determine head vertex, root, num_paths and minpathPos of every vertex
         for (NodeID i = 0; i < num_nodes; i++)
         {
-            //if i is root or start vertex of a path
             if (parent[i] == -1)
                 root = i;
             if (path_id[i] > num_paths)
                 num_paths = path_id[i];
+            //if i is root or start vertex of a path
             if (parent[i] == -1 || path[parent[i]] != i)
+            {
                 for (NodeID j = i, currentPos = 0; j != -1; j = path[j])
                 {
                     head[j] = i;
                     minpathPos[j] = currentPos++;
                 }
+            }
         }
         num_paths++;
+        lengths.reserve(num_paths);
+        for (NodeID i = 0; i < num_nodes; i++)
+        {
+            if (path[i] == -1)
+            {
+                lengths[path_id[i]] = minpathPos[i] + 1;
+            }
+        }
     }
-    //function that will fill the minpath leaves with the corresponding initial weight (Karger, smallest cut that 1-respects given tree)
-    // void set(NodeID v, const int &value)
-    // {
-    //     //TODO change s.t
-    //     P.set(minpathPos[v], value);
-    // }
 
-    // int MinPath(NodeID v)
-    // {
-    //     int res = numeric_limits<int>::max();
-    //     //go through all paths until we hit the root of spantree
-    //     for (; head[v] != root; v = parent[head[v]])
-    //     {
-    //         res = min(res, P.minprefix(minpathPos[head[v]], minpathPos[v]));
-    //     }
-    //     res = min(res, P.minprefix(minpathPos[root], minpathPos[v]));
-    //     return res;
-    // }
+    void build()
+    {
+        for (auto &i : P)
+        {
+            i->build();
+        }
+    }
+    // function that will fill the minpath leaves with the corresponding initial weight (Karger, smallest cut that 1-respects given tree)
+    void set(NodeID v, const int &value)
+    {
+        P[path_id[v]]->set(minpathPos[v], value);
+    }
 
-    // void AddPath(NodeID v, const int &value)
-    // {
-    //     //go through all paths until we hit the root of spantree
-    //     for (; head[v] != root; v = parent[head[v]])
-    //     {
-    //         P.addprefix(minpathPos[head[v]], minpathPos[v], value);
-    //     }
-    //     P.addprefix(minpathPos[root], minpathPos[v], value);
-    // }
+    /*weight initialization 
+    See "Minimum Cuts in Near Linear Time" by David R. Karger 
+    + "On Finding Lowest Common Ancestors: Simplification and Parallelization" by Baruch Schieber and Uzi Vishkin
+    */
+    void InitializeWeight()
+    {
+        //preprocessing O(n) to query LCA in O(1)
+        pvector<bool> visited(num_nodes, false);
+        pvector<int> preorder(num_nodes);
+        pvector<int> levels(num_nodes);
+        pvector<int> sizes(num_nodes);
+        pvector<int> inlabel(num_nodes);
+        pvector<int> ascendant(num_nodes);
+        unordered_map<int, int> head;
+        int index = 1;
+        PreOrder(root, index, 0, preorder, levels, sizes, visited);
+
+        //compute inlabel
+        for (NodeID v = 0; v < num_nodes; v++)
+        {
+            //step  2.1
+            int i = preorder[v] - 1;
+            i = i ^ (preorder[v] + sizes[v] - 1);
+            i = log2(i);
+            //step 2.2.
+            inlabel[v] = ((preorder[v] + sizes[v] - 1) >> i) << i;
+        }
+        //compute ascendant
+        GetAscendants(root, ascendant, inlabel);
+
+        //compute head
+        for (NodeID v = 0; v < num_nodes; v++)
+        {
+            if (inlabel[v] != inlabel[parent[v]] || parent[v] == -1)
+                head[inlabel[v]] = v;
+        }
+        //preprocessing done for lca
+
+        //delta[i] holds weight of all edges of the descandants
+        pvector<NodeID> delta(num_nodes, 0);
+        //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
+        pvector<NodeID> rho(num_nodes, 0);
+        // pvector<NodeID> weights(num_nodes);
+        //postorder[i] stores the node visited on postorder iteration i (needed for computing treefix sum)
+        pvector<NodeID> postorder(num_nodes);
+        PostOrder(root, postorder);
+
+        for (NodeID v : postorder)
+        {
+            for (WNode u : graph.out_neigh(v))
+            {
+                delta[v] += u.w;
+                NodeID z = LCA_Query(u.v, v, inlabel, ascendant, levels, head);
+                rho[z] += u.w;
+            }
+        }
+        for (NodeID v : postorder)
+        {
+            for (NodeID u : tree.out_neigh(v))
+            {
+                if (parent[u] == v)
+                {
+                    delta[v] += delta[u];
+                    rho[v] += rho[u];
+                }
+            }
+        }
+
+        for (int i = 0; i < num_nodes; i++)
+        {
+            set(i, delta[i] - rho[i]);
+        }
+
+        int j = 0;
+        cout << "postorder: " << endl;
+        for (auto i : postorder)
+            cout << j++ << ": " << i << endl;
+
+        j = 0;
+        cout << "delta: " << endl;
+        for (auto i : delta)
+            cout << j++ << ": " << i << endl;
+        j = 0;
+        cout << "rho: " << endl;
+        for (auto i : rho)
+            cout << j++ << ": " << i << endl;
+        j = 0;
+        cout << "weights: " << endl;
+        for (int i = 0; i < num_nodes; i++)
+            cout << j++ << ": " << delta[i] - rho[i] << endl;
+    }
+
+    /* ------------------------------functions for lca----------------------------*/
+
+    //build preorder numbering, size of subtrees and depth level of all vertices
+    void PreOrder(int u, int &index, int level, pvector<int> &preorder, pvector<int> &levels, pvector<int> &sizes, pvector<bool> &visited)
+    {
+        if (!visited[u])
+            visited[u] = true;
+        levels[u] = level;
+        preorder[u] = index++;
+        sizes[u] = 1;
+
+        for (auto it : tree.out_neigh(u))
+        {
+            if (!visited[it])
+            {
+                PreOrder(it, index, level + 1, preorder, levels, sizes, visited);
+                sizes[u] += sizes[it];
+            }
+        }
+
+        //iterative but can't get subtree sizes
+
+        // pvector<int> visited(num_nodes, -1);
+        // int index = 1;
+        // stack<int> vertices;
+        // vertices.push(root);
+        // while (!vertices.empty())
+        // {
+        //     int curr = vertices.top();
+        //     vertices.pop();
+        //     if (visited[curr] == -1)
+        //     {
+        //         visited[curr] = 0;
+        //         preorder[curr] = index++;
+        //         for (auto it : tree.out_neigh(curr))
+        //             vertices.push(it);
+        //     }
+        // }
+    }
+
+    //compute ascendants like in paper in bfs traversal
+    void GetAscendants(const int &root, pvector<int> &ascendant, pvector<int> &inlabel)
+    {
+        queue<int> vertices;
+        pvector<bool> visited(num_nodes, false);
+        visited[root] = true;
+        vertices.push(root);
+        while (!vertices.empty())
+        {
+            int curr = vertices.front();
+            vertices.pop();
+            //compute ascendant
+            if (curr == root)
+            {
+                int l = ceil(log2(num_nodes + 1)) - 1;
+                ascendant[root] = 1 << l;
+            }
+            else if (inlabel[curr] == inlabel[parent[curr]])
+                ascendant[curr] = ascendant[parent[curr]];
+            else
+            {
+                int i = log2(inlabel[curr] - (inlabel[curr] & (inlabel[curr] - 1)));
+                ascendant[curr] = ascendant[parent[curr]] + (1 << i);
+            }
+            for (auto it : tree.out_neigh(curr))
+            {
+                if (!visited[it])
+                {
+                    visited[it] = true;
+                    vertices.push(it);
+                }
+            }
+        }
+    }
+
+    //O(1) lca query
+    NodeID LCA_Query(const int &u, const int &v, const pvector<int> &inlabel, const pvector<int> &ascendant, const pvector<int> &level, const unordered_map<int, int> &head)
+    {
+        assert(u >= 0 && v >= 0 && u < num_nodes && v < num_nodes);
+        //Case A
+        if (inlabel[u] == inlabel[v])
+            return level[u] <= level[v] ? u : v;
+        //Case B
+        else
+        {
+            int i, common, j, inlabel_z, k, u_hat, v_hat, inlabel_w, w;
+            //step 1
+            i = log2(inlabel[u] ^ inlabel[v]);
+            //dunno why this is in the paper in step 1
+            // b = ((inlabel[u] >> (i + 1)) << (i + 1)) + (1 << i);
+
+            //step 2
+            common = ascendant[u] & ascendant[v];
+            common = (common >> i) << i;
+            j = log2(common - (common & (common - 1)));
+            inlabel_z = ((inlabel[u] >> (j + 1)) << (j + 1)) + (1 << j);
+            //step 3
+            if (inlabel[u] == inlabel_z)
+                u_hat = u;
+            else
+            {
+                k = ((1 << j) - 1) & ascendant[u];
+                if (k != 0)
+                    k = log2(k);
+                inlabel_w = ((inlabel[u] >> (k + 1)) << (k + 1)) + (1 << k);
+                w = head.find(inlabel_w)->second;
+                u_hat = parent[w];
+            }
+
+            if (inlabel[v] == inlabel_z)
+                v_hat = v;
+            else
+            {
+                k = ((1 << j) - 1) & ascendant[v];
+                if (k != 0)
+                    k = log2(k);
+                inlabel_w = ((inlabel[v] >> (k + 1)) << (k + 1)) + (1 << k);
+                w = head.find(inlabel_w)->second;
+                v_hat = parent[w];
+            }
+
+            return level[u_hat] <= level[v_hat] ? u_hat : v_hat;
+        }
+    }
+
+    /* --------------------------end of functions for lca----------------------------*/
+
+    /* ----------------------functions for treefix sum (needed for 1-mincut values)----------------------------*/
+
+    void PostOrder(const NodeID &root, pvector<NodeID> &postorder)
+    {
+        pvector<bool> visited(num_nodes, false);
+        int index = 0;
+        stack<NodeID> st;
+        st.push(root);
+        while (!st.empty())
+        {
+            NodeID current = st.top();
+            if (!visited[current])
+            {
+                visited[current] = true;
+                for (NodeID i : tree.out_neigh(current))
+                    if (!visited[i])
+                        st.push(i);
+            }
+            else
+            {
+                postorder[index++] = current;
+                st.pop();
+            }
+        }
+    }
+
+    /* -----------------------end of functions for treefix sum (needed for 1-mincut values)-----------------------*/
+
+    int
+    MinPath(NodeID v)
+    {
+        int res = numeric_limits<int>::max();
+        //go through all paths until we hit the root of spantree
+        for (; head[v] != root; v = parent[head[v]])
+        {
+            res = min(res, P[path_id[v]]->minprefix(minpathPos[v]));
+        }
+        res = min(res, P[path_id[v]]->minprefix(minpathPos[v]));
+        return res;
+    }
+
+    void AddPath(NodeID v, const int &value)
+    {
+        //go through all paths until we hit the root of spantree
+        for (; head[v] != root; v = parent[head[v]])
+        {
+            P[path_id[v]]->addprefix(minpathPos[v], value);
+        }
+        P[path_id[v]]->addprefix(minpathPos[v], value);
+    }
 };
 
 #endif
