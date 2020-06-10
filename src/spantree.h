@@ -119,6 +119,7 @@ public:
                 {
                     temp_vertex_degree[v]--;
                     if (temp_vertex_degree[v] == 1)
+                        //change to emplace instead of push
                         q.push(v);
                 }
                 else
