@@ -83,15 +83,16 @@ public:
         {
             cout << i << " " << parent[i] << " " << path[i] << " " << path_id[i] << " " << head[i] << " " << minpathPos[i] << endl;
         }
-        cout << "num_paths: " << num_paths << endl;
-        cout << "root: " << root << endl;
-        cout << "P: " << endl;
-        int j = 0;
-        for (auto i : P)
-        {
-            cout << "Path ID: " << j++ << endl;
-            i->print();
-        }
+        // cout << "num_paths: " << num_paths << endl;
+        // cout << "root: " << root << endl;
+        // cout << "P: " << endl;
+        // int j = 0;
+        // for (auto i : P)
+        // {
+        //     cout << "Path ID: " << j++ << endl;
+        //     i->print();
+        //     cout << endl;
+        // }
         cout << "------------------------------------------" << endl;
     }
 
@@ -256,7 +257,7 @@ public:
         pvector<int> sizes(num_nodes);
         pvector<int> inlabel(num_nodes);
         pvector<int> ascendant(num_nodes);
-        unordered_map<int, int> head;
+        unordered_map<int, int> head_;
         int index = 1;
         PreOrder(root, index, 0, preorder, levels, sizes, visited);
 
@@ -277,7 +278,7 @@ public:
         for (NodeID v = 0; v < num_nodes; v++)
         {
             if (inlabel[v] != inlabel[parent[v]] || parent[v] == -1)
-                head[inlabel[v]] = v;
+                head_[inlabel[v]] = v;
         }
         //preprocessing done for lca
 
@@ -285,17 +286,17 @@ public:
         pvector<NodeID> delta(num_nodes, 0);
         //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
         pvector<NodeID> rho(num_nodes, 0);
-        // pvector<NodeID> weights(num_nodes);
         //postorder[i] stores the node visited on postorder iteration i (needed for computing treefix sum)
         pvector<NodeID> postorder(num_nodes);
         PostOrder(root, postorder);
 
-        for (NodeID v : postorder)
+        for (NodeID v : graph.vertices())
         {
             for (WNode u : graph.out_neigh(v))
             {
                 delta[v] += u.w;
-                NodeID z = LCA_Query(u.v, v, inlabel, ascendant, levels, head);
+                NodeID z = LCA_Query(u.v, v, inlabel, ascendant, levels, head_);
+                // cout << v << " " << u.v << " " << z << " " << endl;
                 rho[z] += u.w;
             }
         }
@@ -315,24 +316,29 @@ public:
         {
             set(i, delta[i] - rho[i]);
         }
+        build();
+        // int j = 0;
+        // cout << "preorder: " << endl;
+        // for (auto i : preorder)
+        //     cout << j++ << ": " << i << endl;
 
-        int j = 0;
-        cout << "postorder: " << endl;
-        for (auto i : postorder)
-            cout << j++ << ": " << i << endl;
+        // j = 0;
+        // cout << "postorder: " << endl;
+        // for (auto i : postorder)
+        //     cout << j++ << ": " << i << endl;
 
-        j = 0;
-        cout << "delta: " << endl;
-        for (auto i : delta)
-            cout << j++ << ": " << i << endl;
-        j = 0;
-        cout << "rho: " << endl;
-        for (auto i : rho)
-            cout << j++ << ": " << i << endl;
-        j = 0;
-        cout << "weights: " << endl;
-        for (int i = 0; i < num_nodes; i++)
-            cout << j++ << ": " << delta[i] - rho[i] << endl;
+        // j = 0;
+        // cout << "delta: " << endl;
+        // for (auto i : delta)
+        //     cout << j++ << ": " << i << endl;
+        // j = 0;
+        // cout << "rho: " << endl;
+        // for (auto i : rho)
+        //     cout << j++ << ": " << i << endl;
+        // j = 0;
+        // cout << "weights: " << endl;
+        // for (int i = 0; i < num_nodes; i++)
+        //     cout << j++ << ": " << delta[i] - rho[i] << endl;
     }
 
     /* ------------------------------functions for lca----------------------------*/
@@ -411,7 +417,8 @@ public:
     }
 
     //O(1) lca query
-    NodeID LCA_Query(const int &u, const int &v, const pvector<int> &inlabel, const pvector<int> &ascendant, const pvector<int> &level, const unordered_map<int, int> &head)
+    NodeID LCA_Query(const int &u, const int &v, const pvector<int> &inlabel,
+                     const pvector<int> &ascendant, const pvector<int> &level, const unordered_map<int, int> &head)
     {
         assert(u >= 0 && v >= 0 && u < num_nodes && v < num_nodes);
         //Case A
@@ -490,8 +497,7 @@ public:
 
     /* -----------------------end of functions for treefix sum (needed for 1-mincut values)-----------------------*/
 
-    int
-    MinPath(NodeID v)
+    int MinPath(NodeID v)
     {
         int res = numeric_limits<int>::max();
         //go through all paths until we hit the root of spantree
@@ -511,6 +517,27 @@ public:
             P[path_id[v]]->addprefix(minpathPos[v], value);
         }
         P[path_id[v]]->addprefix(minpathPos[v], value);
+    }
+
+    int compute()
+    {
+        int pos_inf = (int)2.5e8;
+        int neg_inf = (int)-1 * 2.5e8;
+        InitializeWeight();
+        queue<NodeID> leaves;
+        for (NodeID i = 0; i < num_nodes; i++)
+            if (tree.out_degree(i) == 1)
+                leaves.push(i);
+        cout << "leaves: " << endl;
+        while (!leaves.empty())
+        {
+            cout << leaves.front() << " ";
+            leaves.pop();
+        }
+        cout << endl;
+        print();
+
+        return 0;
     }
 };
 
