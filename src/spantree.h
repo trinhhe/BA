@@ -83,16 +83,16 @@ public:
         {
             cout << i << " " << parent[i] << " " << path[i] << " " << path_id[i] << " " << head[i] << " " << minpathPos[i] << endl;
         }
-        // cout << "num_paths: " << num_paths << endl;
-        // cout << "root: " << root << endl;
-        // cout << "P: " << endl;
-        // int j = 0;
-        // for (auto i : P)
-        // {
-        //     cout << "Path ID: " << j++ << endl;
-        //     i->print();
-        //     cout << endl;
-        // }
+        cout << "num_paths: " << num_paths << endl;
+        cout << "root: " << root << endl;
+        cout << "P: " << endl;
+        int j = 0;
+        for (auto i : P)
+        {
+            cout << "Path ID: " << j++ << endl;
+            i->print();
+            cout << endl;
+        }
         cout << "------------------------------------------" << endl;
     }
 
@@ -521,8 +521,8 @@ public:
 
     int compute()
     {
-        int pos_inf = (int)2.5e8;
-        int neg_inf = (int)-1 * 2.5e8;
+        // int pos_inf = (int)2.5e8;
+        // int neg_inf = (int)-1 * 2.5e8;
         InitializeWeight();
         queue<NodeID> leaves;
         for (NodeID i = 0; i < num_nodes; i++)

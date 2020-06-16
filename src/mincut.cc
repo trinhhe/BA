@@ -251,7 +251,7 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
     }
 }
 
-double binomial(int trials, double p, int weight_cap, default_random_engine gen)
+double binomial(int trials, double p, default_random_engine gen)
 {
     const double max_allowed_deviation = 1e-10;
     if (p > 1 - max_allowed_deviation)
@@ -261,7 +261,7 @@ double binomial(int trials, double p, int weight_cap, default_random_engine gen)
 
     double prob = pow(1 - p, trials);
     double cum_prob = prob;
-    for (int i = 0; i <= weight_cap; ++i)
+    for (int i = 0; i <= trials; ++i)
     {
         if (cum_prob >= u - max_allowed_deviation)
         {
@@ -271,7 +271,7 @@ double binomial(int trials, double p, int weight_cap, default_random_engine gen)
         cum_prob += prob;
     }
 
-    return weight_cap;
+    return trials;
 }
 
 pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &trees)
@@ -344,7 +344,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
 
         for (int i = 0; i < m; i++)
         {
-            int weight = binomial(G[i].v.w, p, weight_cap, gen);
+            int weight = binomial(min(weight_cap, G[i].v.w), p, gen);
             if (weight != 0)
             {
                 edge_id.push_back(i);
@@ -354,8 +354,8 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
         }
 
         //debug
-        // cout << "-----------";
-        // cout << "H size: " << H.size() << "\n";
+        cout << "-----------";
+        cout << "H size: " << H.size() << "\n";
         // for (auto i : H)
         //     assert(i.v.w < max_weight);
 
@@ -499,6 +499,7 @@ size_t MinCut(const WGraph &g)
         // i->print();
         // i->compute();
     }
+    // trees[trees.size() - 1]->print();
 
     // auto tree_graph = WeightedBuilder::Load_CSR_From_Edgelist(tree_edges, true);
 
