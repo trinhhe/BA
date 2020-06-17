@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 #include <cmath>
+#include <utility>
 #include <map>
 
 #include "benchmark.h"
@@ -37,6 +38,40 @@ during graph building.
 
 using namespace std;
 typedef EdgePair<NodeID, WNode> WEdge;
+
+void dfs(WGraph &g, int v, pvector<bool> &visited)
+{
+    // visited[v] = true;
+    // for (auto i : g.out_neigh(v))
+    // {
+    //     if (!visited[i])
+    //         dfs(g, i, visited);
+    // }
+    stack<int> st;
+    st.push(v);
+    while (!st.empty())
+    {
+        auto s = st.top();
+        st.pop();
+        if (!visited[s])
+            visited[s] = true;
+        for (auto i : g.out_neigh(s))
+        {
+            if (!visited[i])
+                st.push(i);
+        }
+    }
+}
+
+bool isConnected(WGraph &g)
+{
+    pvector<bool> visited(g.num_nodes(), false);
+    dfs(g, 0, visited);
+    for (int i : visited)
+        if (!i)
+            return false;
+    return true;
+}
 
 NodeID find(int *parent, NodeID i)
 {
@@ -125,7 +160,7 @@ pvector<WEdge> Kruskal(const pvector<WEdge> &WEdgelist, int n, bool min)
 }
 
 //outputs MST as edgelist with edge id (sorted)
-pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, pvector<pair<double, int>> &load, int n)
+pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<double, int>> &load, int n)
 {
     // pvector<pair<double, int>> load_copy(load.begin(), load.end());
 
@@ -144,29 +179,34 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, pvector<pair<double, int>
 
     int tree_edges = 0;
     // current edge from graph
-    int i = 0;
+    size_t j = 0;
     /* debug */
-    // cout << "---------- H ------------ size: " << H.size() << "\n";
-    // for (auto i : H)
-    //     cout
-    //         << i.u << " " << i.v << "\n";
-    // cout << "-----------load (load, edge id) size: " << load.size() << "\n";
-    // for (auto i : load)
-    //     cout << i.first << " " << i.second << "\n";
+    // cout << "-------------before Kruskal--------------" << endl;
+    // for (size_t i = 0; i < load.size(); i++)
+    //     cout << load[i].first << ' ' << load[i].second << endl;
+    // cout << "-------------before Kruskal--------------" << endl;
+
     /*debug */
+    // cout << load[j].first << " " << load[j].second;
     while (tree_edges < n - 1)
     {
-        pair<double, int> edge = load[i];
-        NodeID x = find(parent, H[edge.second].u);
-        NodeID y = find(parent, H[edge.second].v.v);
+        // assert(load[j].second >= 0);
+        pair<double, int> edge = load[j];
+        // cout << load[j].first << " " << load[j].second << "\n";
+        NodeID x = find(parent, H[(size_t)edge.second].u);
+        NodeID y = find(parent, H[(size_t)edge.second].v.v);
         if (x != y)
         {
             (*tree_list)[tree_edges] = edge.second;
             Union(parent, size, x, y);
             tree_edges++;
         }
-        i++;
+        j++;
     }
+    // cout << "-------------after Kruskal--------------" << endl;
+    // for (size_t i = 0; i < load.size(); i++)
+    //     cout << load[i].first << ' ' << load[i].second << endl;
+    // cout << "-------------after Kruskal--------------" << endl;
 
     delete[] parent;
     delete[] size;
@@ -191,16 +231,18 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
     double eps, int n, int m)
 {
     //pair contains the edge id with its load
-    pvector<pair<double, int>> load(m);
+    vector<pair<double, int>> load;
+    load.reserve(m);
     // pvector<double> tree_weights;
     // tree_weights.reserve(n);
     double packing_value = 0;
     double inc = (eps * eps) / (3 * log(m));
+    // cout << inc << endl;
     // default_random_engine gen(time(NULL));
     pair<double, pvector<pvector<int> *>> res;
 
     for (int i = 0; i < m; i++)
-        load[i] = make_pair(0.0, i);
+        load.push_back(make_pair(0.0, i));
 
     while (true)
     {
@@ -234,7 +276,7 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
                 {
                     res.first = packing_value;
                     //debug
-                    // cout << "spantree size before packingweight: " << res.second.size() << endl;
+                    cout << "spantree size before packingweight: " << res.second.size() << endl;
                     // for (auto i : res.second)
                     // {
                     //     for (auto j : *i)
@@ -361,7 +403,13 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
 
         //     cout << endl;
         //debug
-        if (H.size() != 0)
+        bool connected;
+        {
+            auto tmp = WeightedBuilder::Load_CSR_From_Edgelist(H, true);
+            connected = isConnected(tmp);
+        }
+
+        if (H.size() != 0 && connected)
         {
 
             //contains packing value and all trees
@@ -420,7 +468,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
 
                 return trees;
             }
-
+            cout << "packvalue and upperbound" << res.first << " " << 0.5 * (1.0 - eps2) / (1.0 + eps1) * b << endl;
             if (res.first < 0.5 * (1.0 - eps2) / (1.0 + eps1) * b)
                 c_dash /= 2.0;
             else
@@ -592,40 +640,6 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
     if (mincut != test_min)
         cout << mincut << " != " << test_min << endl;
     return mincut == test_min;
-}
-
-void dfs(WGraph &g, int v, pvector<bool> &visited)
-{
-    // visited[v] = true;
-    // for (auto i : g.out_neigh(v))
-    // {
-    //     if (!visited[i])
-    //         dfs(g, i, visited);
-    // }
-    stack<int> st;
-    st.push(v);
-    while (!st.empty())
-    {
-        auto s = st.top();
-        st.pop();
-        if (!visited[s])
-            visited[s] = true;
-        for (auto i : g.out_neigh(s))
-        {
-            if (!visited[i])
-                st.push(i);
-        }
-    }
-}
-
-bool isConnected(WGraph &g)
-{
-    pvector<bool> visited(g.num_nodes(), false);
-    dfs(g, 0, visited);
-    for (int i : visited)
-        if (!i)
-            return false;
-    return true;
 }
 
 int main(int argc, char *argv[])
