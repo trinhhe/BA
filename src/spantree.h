@@ -9,6 +9,7 @@
 #include <queue>
 #include <stack>
 #include <unordered_map>
+#include <set>
 // #include <typeinfo>
 
 #include "graph.h"
@@ -27,6 +28,8 @@ typedef int32_t WeightT;
 typedef NodeWeight<NodeID, WeightT> WNode;
 typedef CSRGraph<NodeID, WNode> WGraph;
 typedef int32_t PathID;
+int INT_MAX = numeric_limits<int>::max();
+int INT_MIN = numeric_limits<int>::min();
 
 class SpanTree
 {
@@ -51,11 +54,17 @@ class SpanTree
     //pointers to all minpath structures of the spantree
     pvector<MinimumPath *> P;
 
+    //vector of 1-min cut values of all nodes
+    pvector<int> C;
+    //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
+    pvector<int> rho;
+
 public:
     // CONSTRUCTORS //
 
     SpanTree(const WGraph &G, const WGraph &T) : graph(G), tree(T), num_nodes(G.num_nodes()), num_paths(0), parent(num_nodes, -1),
-                                                 path_id(num_nodes, -1), path(num_nodes), head(num_nodes), minpathPos(num_nodes)
+                                                 path_id(num_nodes, -1), path(num_nodes), head(num_nodes), minpathPos(num_nodes),
+                                                 C(num_nodes), rho(num_nodes, 0)
     {
         PathSegmentation();
         P.reserve(num_paths);
@@ -70,7 +79,7 @@ public:
         for (auto p : P)
             delete p;
         P.clear();
-        cout << "Destructor called" << endl;
+        // cout << "Destructor called" << endl;
     }
 
     void print()
@@ -78,6 +87,8 @@ public:
         cout << "------------------------------------------" << endl;
         cout << "Tree Topology: " << endl;
         tree.PrintTopology();
+        cout << "Graph Topology: " << endl;
+        graph.PrintTopology();
         cout << "parent, path, path_id, head, minpathPos: " << endl;
         for (int i = 0; i < num_nodes; i++)
         {
@@ -231,6 +242,7 @@ public:
         }
     }
 
+    //build on existing leave weights the Minpath structures
     void build()
     {
         for (auto &i : P)
@@ -285,7 +297,7 @@ public:
         //delta[i] holds weight of all edges of the descandants
         pvector<NodeID> delta(num_nodes, 0);
         //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
-        pvector<NodeID> rho(num_nodes, 0);
+        // pvector<NodeID> rho(num_nodes, 0);
         //postorder[i] stores the node visited on postorder iteration i (needed for computing treefix sum)
         pvector<NodeID> postorder(num_nodes);
         PostOrder(root, postorder);
@@ -315,6 +327,7 @@ public:
         for (int i = 0; i < num_nodes; i++)
         {
             set(i, delta[i] - rho[i]);
+            C[i] = delta[i] - rho[i];
         }
         build();
         // int j = 0;
@@ -499,7 +512,7 @@ public:
 
     int MinPath(NodeID v)
     {
-        int res = numeric_limits<int>::max();
+        int res = INT_MAX;
         //go through all paths until we hit the root of spantree
         for (; head[v] != root; v = parent[head[v]])
         {
@@ -519,25 +532,190 @@ public:
         P[path_id[v]]->addprefix(minpathPos[v], value);
     }
 
+    // 1.Case (u,v) and (s,t) cuts are incomparable. (u is not ancestor of s or vice versa)
+    int IncomparableCut()
+    {
+        int pos_inf = (int)2.5e8;
+        //store smallest value from MinPath queries
+        pvector<NodeID> minvalues(num_nodes, INT_MAX);
+        int tmp_min;
+        //visited[i] = NodeID i is true indicates to to ignore all edges which have i as a node (contract edges)
+        pvector<NodeID> visited(num_nodes, 0);
+        //keep track which nodes to contract after bough-phase
+        queue<NodeID> to_remove;
+
+        std::set<NodeID> leaves;
+        for (NodeID i = 0; i < num_nodes; i++)
+            if (tree.out_degree(i) == 1 && i != root)
+                leaves.insert(i);
+        int iterator = num_paths;
+        while (iterator > 0)
+        {
+            for (NodeID v : leaves)
+            {
+                //keep track of the order of vertex in a bough to revert the AddPath operations
+                stack<pair<NodeID, int>> stack;
+                stack.push(make_pair(v, pos_inf));
+                AddPath(v, pos_inf);
+
+                for (; head[v] != v; v = parent[v])
+                {
+                    to_remove.push(v);
+                    for (WNode x : graph.out_neigh(v))
+                    {
+                        if (!visited[x])
+                        {
+                            stack.push(make_pair(x, -2 * x.w));
+                            AddPath(x, -2 * x.w);
+                            tmp_min = MinPath(x);
+                            if (minvalues[v] > tmp_min)
+                                minvalues[v] = tmp_min;
+                        }
+                    }
+                }
+
+                //include head vertex of bough too
+                to_remove.push(v);
+                for (WNode x : graph.out_neigh(v))
+                {
+                    if (!visited[x])
+                    {
+                        stack.push(make_pair(x, -2 * x.w));
+                        AddPath(x, -2 * x.w);
+                        tmp_min = MinPath(x);
+                        if (minvalues[v] > tmp_min)
+                            minvalues[v] = tmp_min;
+                    }
+                }
+
+                //reverse operations
+                while (!stack.empty())
+                {
+                    pair<NodeID, int> curr = stack.top();
+                    stack.pop();
+                    AddPath(curr.first, -1 * curr.second);
+                }
+
+                iterator--;
+            }
+            leaves.clear();
+
+            while (!to_remove.empty())
+            {
+                int curr = to_remove.front();
+                to_remove.pop();
+                visited[curr] = true;
+                if (path[parent[curr]] == -1)
+                    leaves.insert(parent[curr]);
+            }
+        }
+
+        int res = INT_MAX;
+        for (size_t i = 0; i < minvalues.size(); i++)
+        {
+            // assert(
+            //     ((minvalues[i] > 0) && (C[i] > INT_MAX - minvalues[i])) ||
+            //     ((minvalues[i] < 0) && (C[i] < INT_MIN - minvalues[i])));
+            if (res > minvalues[i] + C[i])
+                res = minvalues[i] + C[i];
+        }
+
+        return res;
+    }
+
+    // 2.Case: Difference of two cuts
+    int ComparableCut()
+    {
+        //store smallest value from MinPath queries
+        pvector<NodeID> minvalues(num_nodes, INT_MAX);
+        // int tmp_min;
+        //visited[i] = NodeID i is true indicates to to ignore all edges which have i as a node (contract edges)
+        pvector<NodeID> visited(num_nodes, 0);
+        //keep track which nodes to contract after bough-phase
+        queue<NodeID> to_remove;
+        std::set<NodeID> leaves;
+        for (NodeID i = 0; i < num_nodes; i++)
+            if (tree.out_degree(i) == 1 && i != root)
+                leaves.insert(i);
+        int iterator = num_paths;
+        while (iterator > 0)
+        {
+            for (NodeID v : leaves)
+            {
+                //keep track of the order of vertex in a bough to revert the AddPath operations
+                stack<pair<NodeID, int>> stack;
+                for (; head[v] != v; v = parent[v])
+                {
+                    to_remove.push(v);
+                    for (WNode x : graph.out_neigh(v))
+                    {
+                        if (!visited[x])
+                        {
+                            stack.push(make_pair(x, 2 * x.w));
+                            AddPath(x, 2 * x.w);
+                        }
+                    }
+                    minvalues[v] = MinPath(v);
+                }
+
+                //include head vertex of bough too
+                to_remove.push(v);
+                for (WNode x : graph.out_neigh(v))
+                {
+                    if (!visited[x])
+                    {
+                        stack.push(make_pair(x, 2 * x.w));
+                        AddPath(x, 2 * x.w);
+                    }
+                }
+                minvalues[v] = MinPath(v);
+
+                //reverse operations
+                while (!stack.empty())
+                {
+                    pair<NodeID, int> curr = stack.top();
+                    stack.pop();
+                    AddPath(curr.first, -1 * curr.second);
+                }
+
+                iterator--;
+            }
+            leaves.clear();
+
+            while (!to_remove.empty())
+            {
+                int curr = to_remove.front();
+                to_remove.pop();
+                visited[curr] = true;
+                if (path[parent[curr]] == -1)
+                    leaves.insert(parent[curr]);
+            }
+        }
+
+        int res = INT_MAX;
+        size_t loop = 0;
+        for (size_t i = 0; i < minvalues.size(); i++)
+        {
+            // assert(
+            //     ((minvalues[i] > 0) && (C[i] > INT_MAX - minvalues[i])) ||
+            //     ((minvalues[i] < 0) && (C[i] < INT_MIN - minvalues[i])));
+            if (res > minvalues[i] + 2 * rho[i] + C[i])
+                res = minvalues[i] + 2 * rho[i] + C[i], loop = i;
+        }
+
+        return res;
+    }
+
     int compute()
     {
-        // int pos_inf = (int)2.5e8;
-        // int neg_inf = (int)-1 * 2.5e8;
+        if (num_nodes == 1)
+            return 0;
+        int res = INT_MAX;
         InitializeWeight();
-        queue<NodeID> leaves;
-        for (NodeID i = 0; i < num_nodes; i++)
-            if (tree.out_degree(i) == 1)
-                leaves.push(i);
-        cout << "leaves: " << endl;
-        while (!leaves.empty())
-        {
-            cout << leaves.front() << " ";
-            leaves.pop();
-        }
-        cout << endl;
-        print();
-
-        return 0;
+        // cout << "IncomparableCut: " << IncomparableCut() << endl;
+        // cout << "ComparableCut: " << ComparableCut() << endl;
+        int tmp = min(IncomparableCut(), ComparableCut());
+        return tmp;
     }
 };
 

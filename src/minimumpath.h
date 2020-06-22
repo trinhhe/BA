@@ -99,7 +99,14 @@ public:
     {
         //update all prefix nodes
         for (int i = 0; i <= node; i++)
+        {
+            int t = tree[findIndex(i)];
+            if (value < 0)
+                assert(t >= t + value);
+            else
+                assert(t <= t + value);
             tree[findIndex(i)] += value;
+        }
 
         //going from last to be updated leaf to root
         //phi holds the difference between the updated min value and the previous min value of a node

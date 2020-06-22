@@ -10,12 +10,15 @@
 #include <cmath>
 #include <utility>
 #include <map>
+#include <set>
 
 #include "benchmark.h"
 #include "builder.h"
 #include "command_line.h"
 #include "graph.h"
 #include "pvector.h"
+#include "timer.h"
+#include "util.h"
 #include "spantree.h"
 #include "minimumpath.h"
 
@@ -248,16 +251,7 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
     {
         // shuffle(load.begin(), load.end(), gen);
         pvector<int> *T = KruskalWithLoad(H, load, n);
-        // bool newTree = true;
-        // for (size_t i = 0; i < tree_weights.size(); i++)
-        //     if (EqualSpanTree(T, )
-        //         tree_weights[i] += inc, newTree = false;
 
-        // if (newTree)
-        // {
-        //     tree_weights.push_back(inc);
-        //     span_trees.push_back(&T);
-        // }
         packing_value += inc;
         res.second.push_back(T);
         //update load of edges contained in T
@@ -276,7 +270,7 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
                 {
                     res.first = packing_value;
                     //debug
-                    cout << "spantree size before packingweight: " << res.second.size() << endl;
+                    // cout << "spantree size before packingweight: " << res.second.size() << endl;
                     // for (auto i : res.second)
                     // {
                     //     for (auto j : *i)
@@ -323,8 +317,8 @@ pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &t
 
     uniform_int_distribution<int> distribution(0, trees.size());
     pvector<pvector<int> *> sampled_trees;
-    default_random_engine g;
-    // default_random_engine g(time(NULL));
+    // default_random_engine g;
+    default_random_engine g(time(NULL));
     pvector<bool> visited(trees.size(), 0);
     sampled_trees.reserve(number_of_trees);
     for (int i = 0; i < number_of_trees; i++)
@@ -381,8 +375,8 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
 
         double p = b / c_dash;
         // cout << "p: " << p << endl;
-        default_random_engine gen;
-        // default_random_engine gen(time(NULL));
+        // default_random_engine gen;
+        default_random_engine gen(time(NULL));
 
         for (int i = 0; i < m; i++)
         {
@@ -396,8 +390,8 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
         }
 
         //debug
-        cout << "-----------";
-        cout << "H size: " << H.size() << "\n";
+        // cout << "-----------";
+        // cout << "H size: " << H.size() << "\n";
         // for (auto i : H)
         //     assert(i.v.w < max_weight);
 
@@ -468,7 +462,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
 
                 return trees;
             }
-            cout << "packvalue and upperbound" << res.first << " " << 0.5 * (1.0 - eps2) / (1.0 + eps1) * b << endl;
+            // cout << "packvalue and upperbound" << res.first << " " << 0.5 * (1.0 - eps2) / (1.0 + eps1) * b << endl;
             if (res.first < 0.5 * (1.0 - eps2) / (1.0 + eps1) * b)
                 c_dash /= 2.0;
             else
@@ -504,7 +498,7 @@ size_t MinCut(const WGraph &g)
     assert(g.num_edges() > 0);
     int m = g.num_edges();
     int n = g.num_nodes();
-
+    Timer t;
     pvector<WEdge> G(m);
     int j = 0;
     for (NodeID u : g.vertices())
@@ -525,10 +519,14 @@ size_t MinCut(const WGraph &g)
     double eps1 = 1.0 / 6.0;
     double eps2 = 1.0 / 5.0;
 
+    t.Start();
     pvector<pvector<WEdge> *> tmp = SpanningTreesGenerator(G, 1.0, eps1, eps2, n, m);
+    t.Stop();
+    PrintStep("trees generator:     ", t.Seconds());
+    t.Start();
     pvector<SpanTree *> trees;
     trees.reserve(tmp.size());
-    //vector of csr_trees to keep them in scope
+    // vector of csr_trees to keep them in scope
     pvector<WGraph> csr_array(tmp.size());
     j = 0;
     for (auto it : tmp)
@@ -539,26 +537,44 @@ size_t MinCut(const WGraph &g)
         // xd->print();
         delete it;
     }
-
+    t.Stop();
+    PrintStep("Construct SpanTrees: ", t.Seconds());
     cout << "spanntrees: " << trees.size() << endl;
+
+    t.Start();
+    int res = numeric_limits<int>::max();
+    j = 0;
+    int f = 0;
     for (auto i : trees)
     {
-        i->InitializeWeight();
-        // i->print();
-        // i->compute();
+        int tmp = i->compute();
+        // cout << tmp << endl;
+        if (res > tmp)
+            res = tmp, f = j;
+        j++;
     }
-    // trees[trees.size() - 1]->print();
+    t.Stop();
+    PrintStep("min compute:         ", t.Seconds());
+    // cout << "index of mintree: " << f << endl;
+    // cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+    // cout << "res: " << trees[13]->compute();
+    // trees[13]->print();
+    for (auto i : trees)
+        delete i;
+    // cout << "res: " << res << endl;
 
-    // auto tree_graph = WeightedBuilder::Load_CSR_From_Edgelist(tree_edges, true);
+    // auto treelist = Kruskal(G, n, true);
+    // auto t = WeightedBuilder::Load_CSR_From_Edgelist(treelist, true);
+    // auto T = new SpanTree(g, t);
+    // int xd = T->compute();
+    // T->print();
+    // cout << "cut value: " << xd << endl;
 
-    // SpanTree T(g, tree_graph);
-
-    // T.InitializeWeight();
-    // T.build();
-    // T.print();
-    // for (auto i : spantree_collection)
-    //     delete i;
-    return 0;
+    // T->print();
+    // int tmp;
+    // tmp = T->compute();
+    // cout << "2cut value: " << tmp << endl;
+    return res;
 }
 
 void PrintMinCutValue(const WGraph &g, size_t min_cut_value)
