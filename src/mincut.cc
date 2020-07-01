@@ -163,11 +163,11 @@ pvector<WEdge> Kruskal(const pvector<WEdge> &WEdgelist, int n, bool min)
 }
 
 //outputs MST as edgelist with edge id (sorted)
-pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<double, int>> &load, int n)
+pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<int, int>> &turn_number, int n)
 {
-    // pvector<pair<double, int>> load_copy(load.begin(), load.end());
+    // pvector<pair<double, int>> turn_number_copy(turn_number.begin(), turn_number.end());
 
-    sort(load.begin(), load.end());
+    sort(turn_number.begin(), turn_number.end());
     // contains the edge ids for mst
     pvector<int> *tree_list = new pvector<int>(n - 1);
     //array to help resolving cycles
@@ -185,17 +185,17 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<double, int>>
     size_t j = 0;
     /* debug */
     // cout << "-------------before Kruskal--------------" << endl;
-    // for (size_t i = 0; i < load.size(); i++)
-    //     cout << load[i].first << ' ' << load[i].second << endl;
+    // for (size_t i = 0; i < turn_number.size(); i++)
+    //     cout << turn_number[i].first << ' ' << turn_number[i].second << endl;
     // cout << "-------------before Kruskal--------------" << endl;
 
     /*debug */
-    // cout << load[j].first << " " << load[j].second;
+    // cout << turn_number[j].first << " " << turn_number[j].second;
     while (tree_edges < n - 1)
     {
-        // assert(load[j].second >= 0);
-        pair<double, int> edge = load[j];
-        // cout << load[j].first << " " << load[j].second << "\n";
+        // assert(turn_number[j].second >= 0);
+        pair<int, int> edge = turn_number[j];
+        // cout << turn_number[j].first << " " << turn_number[j].second << "\n";
         NodeID x = find(parent, H[(size_t)edge.second].u);
         NodeID y = find(parent, H[(size_t)edge.second].v.v);
         if (x != y)
@@ -207,8 +207,8 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<double, int>>
         j++;
     }
     // cout << "-------------after Kruskal--------------" << endl;
-    // for (size_t i = 0; i < load.size(); i++)
-    //     cout << load[i].first << ' ' << load[i].second << endl;
+    // for (size_t i = 0; i < turn_number.size(); i++)
+    //     cout << turn_number[i].first << ' ' << turn_number[i].second << endl;
     // cout << "-------------after Kruskal--------------" << endl;
 
     delete[] parent;
@@ -230,12 +230,12 @@ bool EqualSpanTree(const pvector<int> &A, const pvector<int> &B)
 }
 
 pair<double, pvector<pvector<int> *>> PackingWeight(
-    const pvector<WEdge> &H, pvector<pair<int, int>> &parallel_edges,
-    double eps, int n, int m)
+    const pvector<WEdge> &H, pvector<pair<int, int>> &remaining_capacity,
+    double eps, int n, int m, vector<double> &tree_weights)
 {
-    //pair contains the edge id with its load
-    vector<pair<double, int>> load;
-    load.reserve(m);
+    //pair contains the edge id with its turn_number
+    vector<pair<int, int>> turn_number;
+    turn_number.reserve(m);
     // pvector<double> tree_weights;
     // tree_weights.reserve(n);
     double packing_value = 0;
@@ -243,46 +243,66 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
     // cout << inc << endl;
     // default_random_engine gen(time(NULL));
     pair<double, pvector<pvector<int> *>> res;
-
+    res.second.reserve(n); //maybe take something bigger than n
     for (int i = 0; i < m; i++)
-        load.push_back(make_pair(0.0, i));
+        turn_number.push_back(make_pair(0, i));
 
+    bool stop = false;
     while (true)
     {
-        // shuffle(load.begin(), load.end(), gen);
-        pvector<int> *T = KruskalWithLoad(H, load, n);
+        pvector<int> *T = KruskalWithLoad(H, turn_number, n);
 
-        packing_value += inc;
+        // packing_value += inc;
         res.second.push_back(T);
-        //update load of edges contained in T
+        //update turn_number of edges contained in T
         // cout << "--------------------" << endl;
         // cout << "T: " << endl;
+        int smallest_remaining_capacity = numeric_limits<int>::max();
         for (auto i : *T)
         {
-            // cout << i << endl;
-            if (parallel_edges[i].second > 1)
-                parallel_edges[i].second--;
-            else
+            // if (remaining_capacity[i].second > 1)
+            //     remaining_capacity[i].second--;
+            // else
+            // {
+            //     turn_number[i].first += inc;
+            //     remaining_capacity[i].second = remaining_capacity[i].first;
+            //     if (turn_number[i].first >= 1)
+            //     {
+            //         res.first = packing_value;
+            //         //debug
+            //         // cout << "spantree size before packingweight: " << res.second.size() << endl;
+            //         // for (auto i : res.second)
+            //         // {
+            //         //     for (auto j : *i)
+            //         //     {
+            //         //         cout << j << " ";
+            //         //     }
+            //         //     cout << endl;
+            //         // }
+            //         //debug
+            //         return res;
+            //     }
+            // }
+            if (remaining_capacity[i].second < smallest_remaining_capacity)
+                smallest_remaining_capacity = remaining_capacity[i].second;
+        }
+        for (auto i : *T)
+        {
+            remaining_capacity[i].second -= smallest_remaining_capacity;
+            if (remaining_capacity[i].second <= 0)
             {
-                load[i].first += inc;
-                parallel_edges[i].second = parallel_edges[i].first;
-                if (load[i].first >= 1)
-                {
-                    res.first = packing_value;
-                    //debug
-                    // cout << "spantree size before packingweight: " << res.second.size() << endl;
-                    // for (auto i : res.second)
-                    // {
-                    //     for (auto j : *i)
-                    //     {
-                    //         cout << j << " ";
-                    //     }
-                    //     cout << endl;
-                    // }
-                    //debug
-                    return res;
-                }
+                turn_number[i].first++;
+                remaining_capacity[i].second = remaining_capacity[i].first;
+                if (turn_number[i].first >= (3 * log(m)) / (eps * eps))
+                    stop = true;
             }
+        }
+        tree_weights.push_back(smallest_remaining_capacity * inc);
+        packing_value += smallest_remaining_capacity * inc;
+        if (stop)
+        {
+            res.first = packing_value;
+            return res;
         }
     }
 }
@@ -310,36 +330,30 @@ double binomial(int trials, double p, default_random_engine gen)
     return trials;
 }
 
-pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &trees)
+pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &trees, double sum_of_weight, vector<double> &tree_weights)
 {
     if (trees.size() < (size_t)number_of_trees)
         return pvector<pvector<int> *>(trees.begin(), trees.end());
 
-    uniform_int_distribution<int> distribution(0, trees.size());
+    // uniform_int_distribution<int> distribution(0, trees.size());
+    discrete_distribution<int> dist(tree_weights.begin(), tree_weights.end());
     pvector<pvector<int> *> sampled_trees;
-    default_random_engine g;
-    // default_random_engine g(time(NULL));
+    // default_random_engine g;
+    default_random_engine g(time(NULL));
     pvector<bool> visited(trees.size(), 0);
     sampled_trees.reserve(number_of_trees);
     for (int i = 0; i < number_of_trees; i++)
     {
-        int tree = distribution(g);
+        int tree = dist(g);
+        cout << tree << " ";
         sampled_trees.push_back(trees[tree]);
         visited[tree] = 1;
     }
+    cout << endl;
     for (size_t i = 0; i < visited.size(); i++)
         if (!visited[i])
             delete trees[i];
-    //debug
-    // cout << "sampling : \n";
-    // for (auto i : sampled_trees)
-    // {
-    //     for (auto j : *i)
-    //         cout << j << " ";
-    //     cout << endl;
-    // }
 
-    //debug
     return sampled_trees;
 }
 
@@ -365,33 +379,35 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
     {
         //WEdge
         pvector<WEdge> H;
-        //parallel_edges[i] keeps track of edge id i its weight value respectively the number of paralllel edges and its cyclic order (if it hits 0, we update the load of edge i in load vector)
-        pvector<pair<int, int>> parallel_edges;
+        //remaining_capacity[i] keeps track of edge id i its turn number and remaining capacity
+        pvector<pair<int, int>> remaining_capacity;
         //edge_id[i] = corresponding edge id of G in H
         pvector<int> edge_id;
         H.reserve(m);
-        parallel_edges.reserve(m);
+        remaining_capacity.reserve(m);
         edge_id.reserve(m);
 
         double p = b / c_dash;
         // cout << "p: " << p << endl;
+
         default_random_engine gen;
         // default_random_engine gen(time(NULL));
 
         for (int i = 0; i < m; i++)
         {
-            int weight = binomial(min(weight_cap, G[i].v.w), p, gen);
+            binomial_distribution<int> dist(min(weight_cap, G[i].v.w), p);
+            int weight = dist(gen);
             if (weight != 0)
             {
                 edge_id.push_back(i);
                 H.push_back(G[i]);
-                parallel_edges.push_back(make_pair(weight, weight));
+                remaining_capacity.push_back(make_pair(weight, weight));
             }
         }
 
         //debug
         // cout << "-----------";
-        // cout << "H size: " << H.size() << "\n";
+        cout << "H size: " << H.size() << "\n";
         // for (auto i : H)
         //     assert(i.v.w < max_weight);
 
@@ -406,24 +422,18 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
         if (H.size() != 0 && connected)
         {
 
+            vector<double> tree_weights;
+            tree_weights.reserve(n);
             //contains packing value and all trees
-            pair<double, pvector<pvector<int> *>> res = PackingWeight(H, parallel_edges, eps2, n, H.size());
+            pair<double, pvector<pvector<int> *>> res = PackingWeight(H, remaining_capacity, eps2, n, H.size(), tree_weights);
             //debug
-            // cout << "spantree size after packingweight: " << res.second.size() << endl;
-            // for (auto i : res.second)
-            // {
-            //     for (auto j : *i)
-            //     {
-            //         cout << j << " ";
-            //     }
-            //     cout << endl;
-            // }
+            cout << "spantree size after packingweight: " << res.second.size() << endl;
             //debug
             if (lastrun || p > 1 - max_allowed_deviation)
             {
                 int number_of_trees = ceil(-d * log(n) / log(1 - f));
                 pvector<pvector<int> *> tmp;
-                tmp = sampling(number_of_trees, res.second);
+                tmp = sampling(number_of_trees, res.second, res.first, tree_weights);
 
                 //debug
                 // cout << "tmp size: " << tmp.size() << endl;
@@ -526,40 +536,40 @@ size_t MinCut(const WGraph &g)
     t.Stop();
     PrintStep("trees generator:                                           ", t.Seconds());
     t.Start();
-    pvector<SpanTree *> trees;
-    trees.reserve(tmp.size());
-    // vector of csr_trees to keep them in scope
-    pvector<WGraph> csr_array(tmp.size());
-    j = 0;
-    for (auto it : tmp)
-    {
-        csr_array[j] = WeightedBuilder::Load_CSR_From_Edgelist(*it, true);
-        auto xd = new SpanTree(g, csr_array[j++]);
-        trees.push_back(xd);
-        delete it;
-    }
-    t.Stop();
-    PrintStep("build csr graphs, spantree construct and pathsegmentation: ", t.Seconds());
-    cout << "spanntrees: " << trees.size() << endl;
+    // pvector<SpanTree *> trees;
+    // trees.reserve(tmp.size());
+    // // vector of csr_trees to keep them in scope
+    // pvector<WGraph> csr_array(tmp.size());
+    // j = 0;
+    // for (auto it : tmp)
+    // {
+    //     csr_array[j] = WeightedBuilder::Load_CSR_From_Edgelist(*it, true);
+    //     auto xd = new SpanTree(g, csr_array[j++]);
+    //     trees.push_back(xd);
+    //     delete it;
+    // }
+    // t.Stop();
+    // PrintStep("build csr graphs, spantree construct and pathsegmentation: ", t.Seconds());
+    cout << "spanntrees: " << tmp.size() << endl;
 
-    t.Start();
+    // t.Start();
     int res = numeric_limits<int>::max();
-    j = 0;
-    int xd = 0;
-    for (auto i : trees)
-    {
-        // cout << "#tree: " << j << endl;
-        int tmp = i->compute(xd);
-        // cout << tmp << endl;
-        if (res > tmp)
-            res = tmp;
-        j++;
-    }
-    t.Stop();
-    PrintStep("min compute:                                               ", t.Seconds());
-    for (auto i : trees)
-        delete i;
-    cout << "res: " << res << " solution of: " << xd << endl;
+    // j = 0;
+    // int xd = 0;
+    // for (auto i : trees)
+    // {
+    //     // cout << "#tree: " << j << endl;
+    //     int tmp = i->compute(xd);
+    //     // cout << tmp << endl;
+    //     if (res > tmp)
+    //         res = tmp;
+    //     j++;
+    // }
+    // t.Stop();
+    // PrintStep("min compute:                                               ", t.Seconds());
+    // for (auto i : trees)
+    //     delete i;
+    // cout << "res: " << res << " solution of: " << xd << endl;
 
     // pvector<WEdge> treelist;
     // debug for test8.wel (incomparable)
