@@ -317,8 +317,8 @@ pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &t
 
     uniform_int_distribution<int> distribution(0, trees.size());
     pvector<pvector<int> *> sampled_trees;
-    // default_random_engine g;
-    default_random_engine g(time(NULL));
+    default_random_engine g;
+    // default_random_engine g(time(NULL));
     pvector<bool> visited(trees.size(), 0);
     sampled_trees.reserve(number_of_trees);
     for (int i = 0; i < number_of_trees; i++)
@@ -375,8 +375,8 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
 
         double p = b / c_dash;
         // cout << "p: " << p << endl;
-        // default_random_engine gen;
-        default_random_engine gen(time(NULL));
+        default_random_engine gen;
+        // default_random_engine gen(time(NULL));
 
         for (int i = 0; i < m; i++)
         {
@@ -513,6 +513,8 @@ size_t MinCut(const WGraph &g)
                 // cout << G[j].u << " " << G[j].v;
                 j++;
             }
+            // else
+            //     break;
         }
     }
 
@@ -522,7 +524,7 @@ size_t MinCut(const WGraph &g)
     t.Start();
     pvector<pvector<WEdge> *> tmp = SpanningTreesGenerator(G, 1.0, eps1, eps2, n, m);
     t.Stop();
-    PrintStep("trees generator:     ", t.Seconds());
+    PrintStep("trees generator:                                           ", t.Seconds());
     t.Start();
     pvector<SpanTree *> trees;
     trees.reserve(tmp.size());
@@ -534,46 +536,60 @@ size_t MinCut(const WGraph &g)
         csr_array[j] = WeightedBuilder::Load_CSR_From_Edgelist(*it, true);
         auto xd = new SpanTree(g, csr_array[j++]);
         trees.push_back(xd);
-        // xd->print();
         delete it;
     }
     t.Stop();
-    PrintStep("Construct SpanTrees: ", t.Seconds());
+    PrintStep("build csr graphs, spantree construct and pathsegmentation: ", t.Seconds());
     cout << "spanntrees: " << trees.size() << endl;
 
     t.Start();
     int res = numeric_limits<int>::max();
     j = 0;
-    int f = 0;
+    int xd = 0;
     for (auto i : trees)
     {
-        int tmp = i->compute();
+        // cout << "#tree: " << j << endl;
+        int tmp = i->compute(xd);
         // cout << tmp << endl;
         if (res > tmp)
-            res = tmp, f = j;
+            res = tmp;
         j++;
     }
     t.Stop();
-    PrintStep("min compute:         ", t.Seconds());
-    // cout << "index of mintree: " << f << endl;
-    // cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-    // cout << "res: " << trees[13]->compute();
-    // trees[13]->print();
+    PrintStep("min compute:                                               ", t.Seconds());
     for (auto i : trees)
         delete i;
-    // cout << "res: " << res << endl;
+    cout << "res: " << res << " solution of: " << xd << endl;
 
-    // auto treelist = Kruskal(G, n, true);
-    // auto t = WeightedBuilder::Load_CSR_From_Edgelist(treelist, true);
-    // auto T = new SpanTree(g, t);
-    // int xd = T->compute();
-    // T->print();
-    // cout << "cut value: " << xd << endl;
+    // pvector<WEdge> treelist;
+    // debug for test8.wel (incomparable)
+    // treelist.reserve(8);
+    // treelist.push_back(WEdge(0, WNode(1, 6)));
+    // treelist.push_back(WEdge(0, WNode(2, 7)));
+    // treelist.push_back(WEdge(0, WNode(4, 1)));
+    // treelist.push_back(WEdge(1, WNode(3, 8)));
+    // treelist.push_back(WEdge(3, WNode(8, 1)));
+    // treelist.push_back(WEdge(4, WNode(5, 9)));
+    // treelist.push_back(WEdge(4, WNode(6, 10)));
+    // treelist.push_back(WEdge(6, WNode(7, 11)));
+    // debug for test9.wel (comparable)
+    // treelist.reserve(4);
+    // treelist.push_back(WEdge(0, WNode(5, 1)));
+    // treelist.push_back(WEdge(1, WNode(3, 7)));
+    // treelist.push_back(WEdge(1, WNode(2, 7)));
+    // treelist.push_back(WEdge(2, WNode(4, 1)));
+    // treelist.push_back(WEdge(0, WNode(1, 1)));
+    // treelist.push_back(WEdge(0, WNode(6, 7)));
 
+    // auto tree = WeightedBuilder::Load_CSR_From_Edgelist(treelist, true);
+    // auto T = new SpanTree(g, tree);
+    // T->InitializeWeight();
     // T->print();
-    // int tmp;
-    // tmp = T->compute();
-    // cout << "2cut value: " << tmp << endl;
+    // auto lol = T->compute();
+    // if (res > lol)
+    //     res = lol;
+    // T->print();
+
     return res;
 }
 

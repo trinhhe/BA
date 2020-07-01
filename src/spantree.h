@@ -10,6 +10,7 @@
 #include <stack>
 #include <unordered_map>
 #include <set>
+#include <list>
 // #include <typeinfo>
 
 #include "graph.h"
@@ -26,6 +27,7 @@ using namespace std;
 typedef int32_t NodeID;
 typedef int32_t WeightT;
 typedef NodeWeight<NodeID, WeightT> WNode;
+typedef EdgePair<NodeID, WNode> WEdge;
 typedef CSRGraph<NodeID, WNode> WGraph;
 typedef int32_t PathID;
 int INT_MAX = numeric_limits<int>::max();
@@ -55,9 +57,9 @@ class SpanTree
     pvector<MinimumPath *> P;
 
     //vector of 1-min cut values of all nodes
-    pvector<int> C;
+    vector<int> C;
     //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
-    pvector<int> rho;
+    vector<int> rho;
 
 public:
     // CONSTRUCTORS //
@@ -84,19 +86,31 @@ public:
 
     void print()
     {
-        cout << "------------------------------------------" << endl;
-        cout << "Tree Topology: " << endl;
-        tree.PrintTopology();
+        cout << "\n------------------------------------------" << endl;
         cout << "Graph Topology: " << endl;
         graph.PrintTopology();
-        cout << "parent, path, path_id, head, minpathPos: " << endl;
+        cout << "Tree Topology: " << endl;
+        tree.PrintTopology();
+        cout << "        parent, path, path_id, head, minpathPos: " << endl;
         for (int i = 0; i < num_nodes; i++)
         {
-            cout << i << " " << parent[i] << " " << path[i] << " " << path_id[i] << " " << head[i] << " " << minpathPos[i] << endl;
+            cout << i << "      " << parent[i] << "      " << path[i] << "      " << path_id[i] << "       " << head[i] << "       " << minpathPos[i] << endl;
         }
         cout << "num_paths: " << num_paths << endl;
         cout << "root: " << root << endl;
         cout << "P: " << endl;
+        int j = 0;
+        for (auto i : P)
+        {
+            cout << "Path ID: " << j++ << endl;
+            i->print();
+            cout << endl;
+        }
+        cout << "------------------------------------------" << endl;
+    }
+    void printpath()
+    {
+        cout << "\n------------------------------------------" << endl;
         int j = 0;
         for (auto i : P)
         {
@@ -295,7 +309,7 @@ public:
         //preprocessing done for lca
 
         //delta[i] holds weight of all edges of the descandants
-        pvector<NodeID> delta(num_nodes, 0);
+        vector<NodeID> delta(num_nodes, 0);
         //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
         // pvector<NodeID> rho(num_nodes, 0);
         //postorder[i] stores the node visited on postorder iteration i (needed for computing treefix sum)
@@ -303,31 +317,33 @@ public:
         PostOrder(root, postorder);
 
         for (NodeID v : graph.vertices())
-        {
+            for (WNode u : graph.out_neigh(v))
+                delta[v] += u.w;
+
+        for (NodeID v : graph.vertices())
             for (WNode u : graph.out_neigh(v))
             {
-                delta[v] += u.w;
-                NodeID z = LCA_Query(u.v, v, inlabel, ascendant, levels, head_);
-                // cout << v << " " << u.v << " " << z << " " << endl;
-                rho[z] += u.w;
+                if (v < u.v)
+                {
+                    NodeID z = LCA_Query(u.v, v, inlabel, ascendant, levels, head_);
+                    // cout << v << " " << u.v << " " << z << endl;
+                    rho[z] += u.w;
+                }
             }
-        }
+
         for (NodeID v : postorder)
         {
-            for (NodeID u : tree.out_neigh(v))
+            if (v != root)
             {
-                if (parent[u] == v)
-                {
-                    delta[v] += delta[u];
-                    rho[v] += rho[u];
-                }
+                delta[parent[v]] += delta[v];
+                rho[parent[v]] += rho[v];
             }
         }
 
         for (int i = 0; i < num_nodes; i++)
         {
-            set(i, delta[i] - rho[i]);
-            C[i] = delta[i] - rho[i];
+            set(i, delta[i] - 2 * rho[i]);
+            C[i] = delta[i] - 2 * rho[i];
         }
         build();
         // int j = 0;
@@ -351,7 +367,7 @@ public:
         // j = 0;
         // cout << "weights: " << endl;
         // for (int i = 0; i < num_nodes; i++)
-        //     cout << j++ << ": " << delta[i] - rho[i] << endl;
+        //     cout << j++ << ": " << C[i] << endl;
     }
 
     /* ------------------------------functions for lca----------------------------*/
@@ -535,6 +551,18 @@ public:
     // 1.Case (u,v) and (s,t) cuts are incomparable. (u is not ancestor of s or vice versa)
     int IncomparableCut()
     {
+        //adj list for now, csr format with its continious memory layout can't handle a case where a vertex has more edges after a contraction
+        list<WNode> adj[num_nodes];
+        for (NodeID u : graph.vertices())
+        {
+            for (WNode wn : graph.out_neigh(u))
+            {
+                adj[u].push_back(wn);
+            }
+        }
+        list<WNode>::iterator it1;
+        list<WNode>::iterator it2;
+
         int pos_inf = (int)2.5e8;
         //store smallest value from MinPath queries
         pvector<NodeID> minvalues(num_nodes, INT_MAX);
@@ -543,11 +571,18 @@ public:
         pvector<NodeID> visited(num_nodes, 0);
         //keep track which nodes to contract after bough-phase
         queue<NodeID> to_remove;
-
+        //keep track of vertex degrees to decide the leaves in next bough phase
+        vector<NodeID> degree(num_nodes);
+        // leaves in current bough phase
         std::set<NodeID> leaves;
         for (NodeID i = 0; i < num_nodes; i++)
+        {
+            degree[i] = tree.out_degree(i);
+            //in case tree is a path, don't include root as a leaf
             if (tree.out_degree(i) == 1 && i != root)
                 leaves.insert(i);
+        }
+
         int iterator = num_paths;
         while (iterator > 0)
         {
@@ -560,34 +595,40 @@ public:
 
                 for (; head[v] != v; v = parent[v])
                 {
+                    degree[v] -= 2;
+                    visited[v] = true;
                     to_remove.push(v);
-                    for (WNode x : graph.out_neigh(v))
-                    {
-                        if (!visited[x])
-                        {
-                            stack.push(make_pair(x, -2 * x.w));
-                            AddPath(x, -2 * x.w);
-                            tmp_min = MinPath(x);
-                            if (minvalues[v] > tmp_min)
-                                minvalues[v] = tmp_min;
-                        }
-                    }
-                }
-
-                //include head vertex of bough too
-                to_remove.push(v);
-                for (WNode x : graph.out_neigh(v))
-                {
-                    if (!visited[x])
+                    for (WNode x : adj[v])
                     {
                         stack.push(make_pair(x, -2 * x.w));
                         AddPath(x, -2 * x.w);
+                    }
+                    for (WNode x : adj[v])
+                    {
                         tmp_min = MinPath(x);
                         if (minvalues[v] > tmp_min)
                             minvalues[v] = tmp_min;
                     }
                 }
 
+                //include head vertex of bough too
+                degree[v] -= 2;
+                visited[v] = true;
+                to_remove.push(v);
+                for (WNode x : adj[v])
+                {
+                    stack.push(make_pair(x, -2 * x.w));
+                    AddPath(x, -2 * x.w);
+                }
+                for (WNode x : adj[v])
+                {
+                    tmp_min = MinPath(x);
+                    if (minvalues[v] > tmp_min)
+                        minvalues[v] = tmp_min;
+                }
+                // "remove" edge to head of vertex, later on all nodes with degree = 1 will be new leaves
+                if (v != root)
+                    degree[parent[v]]--;
                 //reverse operations
                 while (!stack.empty())
                 {
@@ -602,12 +643,42 @@ public:
 
             while (!to_remove.empty())
             {
-                int curr = to_remove.front();
+                NodeID curr = to_remove.front();
                 to_remove.pop();
-                visited[curr] = true;
-                if (path[parent[curr]] == -1)
-                    leaves.insert(parent[curr]);
+                NodeID x = parent[head[curr]];
+                for (it1 = adj[curr].begin(); it1 != adj[curr].end(); ++it1)
+                {
+                    NodeID y = it1->v;
+                    //if visited[y] = true both endpoints of an edge were in a bough,
+                    //if endpoints are not in the same bough we "contract" the edge to the parent of the bough.
+                    //we don't add the other edge to have "symmetry" in adj list since the other endpoint will also be processed later on
+                    if (visited[y])
+                    {
+                        y = parent[head[y]];
+                        if (x != y)
+                            adj[x].push_back(WNode(y, it1->w));
+                    }
+                    else
+                    {
+                        if (x != y)
+                        {
+                            adj[x].push_back(WNode(y, it1->w));
+                            adj[y].push_back(WNode(x, it1->w));
+                        }
+                        for (it2 = adj[y].begin(); it2 != adj[y].end(); ++it2)
+                            if (it2->v == curr)
+                            {
+                                adj[y].erase(it2);
+                                break;
+                            }
+                    }
+                }
+                if (head[curr] != root && degree[parent[head[curr]]] == 1 && path[parent[head[curr]]] == -1)
+                    leaves.insert(parent[head[curr]]);
             }
+            //one node left after contractions which is the root
+            if (iterator == 1 && leaves.empty())
+                leaves.insert(root);
         }
 
         int res = INT_MAX;
@@ -626,17 +697,34 @@ public:
     // 2.Case: Difference of two cuts
     int ComparableCut()
     {
+        list<WNode> adj[num_nodes];
+        for (NodeID u : graph.vertices())
+        {
+            for (WNode wn : graph.out_neigh(u))
+            {
+                adj[u].push_back(wn);
+            }
+        }
+        list<WNode>::iterator it1;
+        list<WNode>::iterator it2;
+
         //store smallest value from MinPath queries
         pvector<NodeID> minvalues(num_nodes, INT_MAX);
-        // int tmp_min;
         //visited[i] = NodeID i is true indicates to to ignore all edges which have i as a node (contract edges)
         pvector<NodeID> visited(num_nodes, 0);
         //keep track which nodes to contract after bough-phase
         queue<NodeID> to_remove;
+        //keep track of vertex degrees to decide the leaves in next bough phase
+        pvector<NodeID> degree(num_nodes);
+        // leaves in current bough phase
         std::set<NodeID> leaves;
         for (NodeID i = 0; i < num_nodes; i++)
+        {
+            degree[i] = tree.out_degree(i);
+            //in case tree is a path, don't include root as a leaf
             if (tree.out_degree(i) == 1 && i != root)
                 leaves.insert(i);
+        }
         int iterator = num_paths;
         while (iterator > 0)
         {
@@ -646,30 +734,30 @@ public:
                 stack<pair<NodeID, int>> stack;
                 for (; head[v] != v; v = parent[v])
                 {
+                    degree[v] -= 2;
+                    visited[v] = true;
                     to_remove.push(v);
-                    for (WNode x : graph.out_neigh(v))
+                    for (WNode x : adj[v])
                     {
-                        if (!visited[x])
-                        {
-                            stack.push(make_pair(x, 2 * x.w));
-                            AddPath(x, 2 * x.w);
-                        }
+                        stack.push(make_pair(x, 2 * x.w));
+                        AddPath(x, 2 * x.w);
                     }
                     minvalues[v] = MinPath(v);
                 }
 
                 //include head vertex of bough too
+                degree[v] -= 2;
+                visited[v] = true;
                 to_remove.push(v);
-                for (WNode x : graph.out_neigh(v))
+                for (WNode x : adj[v])
                 {
-                    if (!visited[x])
-                    {
-                        stack.push(make_pair(x, 2 * x.w));
-                        AddPath(x, 2 * x.w);
-                    }
+                    stack.push(make_pair(x, 2 * x.w));
+                    AddPath(x, 2 * x.w);
                 }
                 minvalues[v] = MinPath(v);
-
+                // "remove" edge to head of vertex, later on all nodes with degree = 1 will be new leaves
+                if (v != root)
+                    degree[parent[v]]--;
                 //reverse operations
                 while (!stack.empty())
                 {
@@ -684,38 +772,97 @@ public:
 
             while (!to_remove.empty())
             {
-                int curr = to_remove.front();
+                NodeID curr = to_remove.front();
                 to_remove.pop();
-                visited[curr] = true;
-                if (path[parent[curr]] == -1)
-                    leaves.insert(parent[curr]);
+                NodeID x = parent[head[curr]];
+                for (it1 = adj[curr].begin(); it1 != adj[curr].end(); ++it1)
+                {
+                    NodeID y = it1->v;
+                    //if visited[y] = true both endpoints of an edge were in a bough,
+                    //if endpoints are not in the same bough we "contract" the edge to the parent of the bough.
+                    //we don't add the other edge to have "symmetry" in adj list since the other endpoint will also be processed later on
+                    if (visited[y])
+                    {
+                        y = parent[head[y]];
+                        if (x != y)
+                            adj[x].push_back(WNode(y, it1->w));
+                    }
+                    else
+                    {
+                        if (x != y)
+                        {
+                            adj[x].push_back(WNode(y, it1->w));
+                            adj[y].push_back(WNode(x, it1->w));
+                        }
+                        for (it2 = adj[y].begin(); it2 != adj[y].end(); ++it2)
+                            if (it2->v == curr)
+                            {
+                                adj[y].erase(it2);
+                                break;
+                            }
+                    }
+                }
+                if (head[curr] != root && degree[parent[head[curr]]] == 1 && path[parent[head[curr]]] == -1)
+                    leaves.insert(parent[head[curr]]);
             }
+            //one node left after contractions which is the root
+            if (iterator == 1 && leaves.empty())
+                leaves.insert(root);
         }
 
         int res = INT_MAX;
-        size_t loop = 0;
+        // cout << "\nminvalues: " << endl;
+        // for (auto i : minvalues)
+        //     cout << i << " ";
+        // cout << "\nrho: " << endl;
+        // for (auto i : rho)
+        //     cout << i << " ";
+        // cout << "\nC: " << endl;
+        // for (auto i : C)
+        //     cout << i << " ";
+
         for (size_t i = 0; i < minvalues.size(); i++)
         {
             // assert(
             //     ((minvalues[i] > 0) && (C[i] > INT_MAX - minvalues[i])) ||
             //     ((minvalues[i] < 0) && (C[i] < INT_MIN - minvalues[i])));
-            if (res > minvalues[i] + 2 * rho[i] + C[i])
-                res = minvalues[i] + 2 * rho[i] + C[i], loop = i;
+            if (res > minvalues[i] + 4 * rho[i] + C[i])
+                res = minvalues[i] + 4 * rho[i] + C[i];
         }
 
         return res;
     }
 
-    int compute()
+    int compute(int &a)
     {
         if (num_nodes == 1)
             return 0;
+
         int res = INT_MAX;
         InitializeWeight();
-        // cout << "IncomparableCut: " << IncomparableCut() << endl;
-        // cout << "ComparableCut: " << ComparableCut() << endl;
-        int tmp = min(IncomparableCut(), ComparableCut());
-        return tmp;
+
+        // cout << "Incomparablecut: " << IncomparableCut() << endl;
+        // cout << "Comparablecut: " << ComparableCut() << endl;
+        int c1 = IncomparableCut();
+        int c2 = ComparableCut();
+        int tmp = min(c1, c2);
+        //debug
+        if (tmp == c1)
+            a = 1;
+        else
+            a = 2;
+        if (res > tmp && tmp > 0)
+            res = tmp;
+        // cout << "C[i]: " << endl;
+        for (int i = 0; i < num_nodes; i++)
+        {
+            // cout << C[i] << " ";
+            if (C[i] < res && C[i] > 0)
+                res = C[i], a = 3;
+        }
+        // cout << endl;
+        // cout << c1 << " " << c2 << " " << res << endl;
+        return res;
     }
 };
 

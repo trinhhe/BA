@@ -323,6 +323,8 @@ public:
         BuilderBase<NodeID_, DestID_, WeightT_> bb(cli);
         bb.needs_weights_ = false;
         bb.symmetrize_ = symmetrize;
+        // auto tmp = bb.MakeGraphFromEL(el);
+        // return bb.SquishGraph(tmp);
         return bb.MakeGraphFromEL(el);
     }
 };
