@@ -7,8 +7,9 @@
 #-----------------------------------------------------------------------#
 
 # Dependencies are the tests it will run
-test-all: test-build test-generate test-load test-verify
+# test-all: test-build test-generate test-load test-verify
 
+test-all: test-build test-load test-verify
 # Does everthing, intended target for users
 test: test-score
 	@if $(MAKE) test-score | grep FAIL > /dev/null; \
@@ -36,7 +37,7 @@ test-build: all
 #-----------------------------------------------------------------------#
 
 # Since all implementations use same code for this, only test one kernel
-GENERATE_KERNEL = bfs
+GENERATE_KERNEL = mincut
 
 # Built-in synthetic graph generators
 test-generate: test-generate-g10 test-generate-u10
@@ -52,12 +53,13 @@ test-generate-%: test/out/generate-%.out
 	fi
 
 # Loading graphs from files
-test-load: test-load-4.gr test-load-4.el test-load-4.wel test-load-4.graph \
-					 test-load-4w.graph test-load-4.mtx test-load-4w.mtx \
-					#  test-load-test.wel
+# test-load: test-load-4.gr test-load-4.el test-load-4.wel test-load-4.graph \
+# 					 test-load-4w.graph test-load-4.mtx test-load-4w.mtx \
+					 
+test-load: test-load-test.wel 
 
 test/out/load-%.out: test/out $(GENERATE_KERNEL)
-	./$(GENERATE_KERNEL) -f test/graphs/$* -n0 > $@
+	./$(GENERATE_KERNEL) -sf test/graphs/$* -n0 > $@
 
 .SECONDARY: # want to keep all intermediate files (test outputs)
 test-load-%: test/out/load-%.out

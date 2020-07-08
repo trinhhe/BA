@@ -330,7 +330,6 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
     double L = (b * (1 + eps1)) / ((eps2 * eps2) / 3 * log(n));
     double p_T = (d * log(n)) / (f * L);
     int number_of_trees = ceil(-d * log(n) / log(1 - f));
-    int s = ceil(log2(n) / 4);
     bool lastrun = 0;
     const double max_allowed_deviation = 1e-10;
     //Upper bound approximation for mincut value
@@ -342,48 +341,8 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
     cout << "b: " << b << endl;
     cout << "c_dash: " << c_dash << endl;
     cout << "treshold for packing value: " << b * (1 + eps1) << endl;
-    bool start = true;
     while (true)
     {
-        if (start)
-        {
-            while (true)
-            {
-                double p = b / c_dash;
-                default_random_engine gen;
-                int count = 0;
-                for (int i = 0; i < s; i++)
-                {
-                    pvector<WEdge> H;
-                    H.reserve(m);
-                    for (int j = 0; j < m; j++)
-                    {
-                        binomial_distribution<int> bin(min(weight_cap, G[i].v.w), p);
-                        gen.seed(i);
-                        int weight = bin(gen);
-                        if (weight != 0)
-                        {
-                            H.push_back(G[i]);
-                        }
-                    }
-                    bool connected;
-                    {
-                        auto tmp = WeightedBuilder::Load_CSR_From_Edgelist(H, true);
-                        connected = isConnected(tmp);
-                    }
-                    if (!connected)
-                    {
-                        c_dash /= 2.0;
-                        break;
-                    }
-                    else
-                        count++;
-                }
-                if (count == s)
-                    break;
-            }
-            start = false;
-        }
         //WEdge
         pvector<WEdge> H;
         //remaining_capacity[i] keeps track of edge id i its turn number and remaining capacity
