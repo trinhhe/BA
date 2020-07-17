@@ -1,0 +1,10 @@
+{
+  "networkx/algorithms/assortativity/tests/test_connectivity.py": true,
+  "networkx/algorithms/bipartite/tests/test_matching.py": true,
+  "networkx/algorithms/connectivity/tests/test_connectivity.py": true,
+  "networkx/algorithms/connectivity/tests/test_kcomponents.py": true,
+  "networkx/algorithms/tests/test_clique.py": true,
+  "networkx/algorithms/tests/test_cluster.py": true,
+  "networkx/algorithms/tests/test_matching.py": true,
+  "networkx/readwrite/tests/test_edgelist.py": true
+}

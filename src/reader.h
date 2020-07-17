@@ -245,7 +245,7 @@ class Reader {
     }
     file.close();
     t.Stop();
-    PrintTime("Read Time", t.Seconds());
+    // PrintTime("Read Time", t.Seconds());
     return el;
   }
 

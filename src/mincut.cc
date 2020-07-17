@@ -37,7 +37,7 @@ Requires input graph:
 Other than symmetrizing, the rest of the requirements are done by SquishCSR
 during graph building.
 
-packing improvement idea 1 & 2
+packing improvement idea 1
 */
 
 using namespace std;
@@ -316,7 +316,31 @@ pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &t
     return sampled_trees;
 }
 
-pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double d, double eps1, double eps2, int n, int m)
+//if choise = true, estimate with summed weight of a vertex, else minimum weight of a maximum spanning tree
+int getUpperbound (const WGraph &g, const pvector<WEdge> &G, bool choice)
+{
+    int res = numeric_limits<int>::max();
+    if (choice)
+    {
+        for(auto i : g.vertices())
+        {
+            int tmp = 0;
+            for (auto j : g.out_neigh(i))
+                tmp += j.w;
+            res = min(res,tmp);
+        }
+    }
+    else
+    {
+        int n = G.size();
+        pvector<WEdge> t = Kruskal(G, n, false);
+        res = t[n - 2].v.w;
+        res *= (n * n);
+    }
+    
+    return res;
+}
+pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<WEdge> &G, double d, double eps1, double eps2, int n, int m)
 {
     assert(eps1 > 0.0 && eps2 > 0.0);
     assert((1.0 - eps2) / (1.0 + eps1) > 2.0 / 3.0);
@@ -334,11 +358,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const pvector<WEdge> &G, double
     bool lastrun = 0;
     const double max_allowed_deviation = 1e-10;
     //Upper bound approximation for mincut value
-    {
-        pvector<WEdge> t = Kruskal(G, n, false);
-        c_dash = t[n - 2].v.w;
-        c_dash *= (n * n);
-    }
+    c_dash = getUpperbound(g, G, true);
     cout << "b: " << b << endl;
     cout << "c_dash: " << c_dash << endl;
     cout << "treshold for packing value: " << b * (1 + eps1) << endl;
@@ -476,7 +496,7 @@ size_t MinCut(const WGraph &g)
     double eps2 = 1.0 / 5.0;
 
     t.Start();
-    pvector<pvector<WEdge> *> tmp = SpanningTreesGenerator(G, 1.0, eps1, eps2, n, m);
+    pvector<pvector<WEdge> *> tmp = SpanningTreesGenerator(g, G, 1.0, eps1, eps2, n, m);
     t.Stop();
     PrintStep("trees generator:                                           ", t.Seconds());
     // t.Start();
@@ -492,29 +512,50 @@ size_t MinCut(const WGraph &g)
         trees.push_back(xd);
         delete it;
     }
-    // t.Stop();
-    // PrintStep("build csr graphs, spantree construct and pathsegmentation: ", t.Seconds());
+    t.Stop();
+    PrintStep("build csr graphs, spantree construct and pathsegmentation: ", t.Seconds());
     cout << "spanntrees: " << tmp.size() << endl;
 
     // t.Start();
     int res = numeric_limits<int>::max();
     // j = 0;
     // // 1,2,3 indiciates incomparablecut, comparablecut or 1-respect mincut
-    // int which_solution = 0;
-    // for (auto i : trees)
-    // {
-    //     // cout << "#tree: " << j << endl;
-    //     int tmp = i->compute(which_solution);
-    //     // cout << tmp << endl;
-    //     if (res > tmp)
-    //         res = tmp;
-    //     j++;
-    // }
-    // t.Stop();
-    // PrintStep("min compute:                                               ", t.Seconds());
+    int which_solution = 0;
+    for (auto i : trees)
+    {
+        // cout << "#tree: " << j << endl;
+        int tmp = i->compute(which_solution);
+        // cout << tmp << endl;
+        if (res > tmp)
+            res = tmp;
+        j++;
+    }
+    // trees[0]->print();
+    t.Stop();
+    PrintStep("min compute:                                               ", t.Seconds());
     for (auto i : trees)
         delete i;
-    // cout << "res: " << res << " solution of: " << which_solution << endl;
+
+    // pvector<WEdge> treelist;
+    // treelist.reserve(n-1);
+    // treelist.push_back(WEdge(0, WNode(1, 12)));
+    // treelist.push_back(WEdge(0, WNode(2, 13)));
+    // treelist.push_back(WEdge(0, WNode(3, 1)));
+    // treelist.push_back(WEdge(1, WNode(4, 11)));
+    // treelist.push_back(WEdge(1, WNode(5, 10)));
+    // treelist.push_back(WEdge(2, WNode(6, 9)));
+    // treelist.push_back(WEdge(2, WNode(7, 8)));
+    // treelist.push_back(WEdge(3, WNode(8, 7)));
+    // treelist.push_back(WEdge(3, WNode(9, 6)));
+    // treelist.push_back(WEdge(9, WNode(10, 1)));
+    // treelist.push_back(WEdge(10, WNode(11, 6)));
+    // WGraph tree = WeightedBuilder::Load_CSR_From_Edgelist(treelist, true);
+    // auto test = new SpanTree(g, tree);
+    // int tmp = test->compute(which_solution);
+    // if (res > tmp)
+    //     res = tmp;
+    // test->print();
+    cout << "res: " << res << " solution of: " << which_solution << endl;
     return res;
 }
 

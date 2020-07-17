@@ -1,0 +1,12 @@
+Graph has 2048 nodes and 10240 undirected edges for degree: 5
+b: 2470.38
+Mincut Upperbound estimate: 4194304
+treshold for packing value: 34585.3
+starting p: 0.000588984
+Packing takes:                 8.65067
+H size: 10240   p: 1.20624     packing value: 4.043     packing size/packing iterations: 2800
+sampling takes:                 0.00088
+trees generator:                                                           8.68742
+spanntrees: 180
+Trial Time:          9.07740
+Average Time:        9.07740

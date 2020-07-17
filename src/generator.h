@@ -155,8 +155,8 @@ public:
                 rng.seed(kRandSeed + block / block_size);
                 for (int64_t e = block; e < std::min(block + block_size, el_size); e++)
                 {
-                    // el[e].v.w = static_cast<WeightT_>(udist(rng));
-                    el[e].v.w = static_cast<WeightT_>(1);
+                    el[e].v.w = static_cast<WeightT_>(udist(rng));
+                    // el[e].v.w = static_cast<WeightT_>(1);
                 }
             }
         }

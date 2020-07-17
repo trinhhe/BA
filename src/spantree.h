@@ -16,6 +16,7 @@
 #include "graph.h"
 #include "pvector.h"
 #include "minimumpath.h"
+#include "timer.h"
 
 /*
 Author: Henry Trinh
@@ -650,10 +651,10 @@ public:
                 {
                     NodeID y = it1->v;
                     //if visited[y] = true both endpoints of an edge were in a bough,
-                    //if endpoints are not in the same bough we "contract" the edge to the parent of the bough.
-                    //we don't add the other edge to have "symmetry" in adj list since the other endpoint will also be processed later on
                     if (visited[y])
                     {
+                        //if endpoints are not in the same bough we "contract" the edge to the parent of the bough.
+                        //we don't add the other edge to have "symmetry" in adj list since the other endpoint will also be processed later on
                         y = parent[head[y]];
                         if (x != y)
                             adj[x].push_back(WNode(y, it1->w));
@@ -779,10 +780,10 @@ public:
                 {
                     NodeID y = it1->v;
                     //if visited[y] = true both endpoints of an edge were in a bough,
-                    //if endpoints are not in the same bough we "contract" the edge to the parent of the bough.
-                    //we don't add the other edge to have "symmetry" in adj list since the other endpoint will also be processed later on
                     if (visited[y])
                     {
+                        //if endpoints are not in the same bough we "contract" the edge to the parent of the bough.
+                        //we don't add the other edge to have "symmetry" in adj list since the other endpoint will also be processed later on
                         y = parent[head[y]];
                         if (x != y)
                             adj[x].push_back(WNode(y, it1->w));
@@ -826,8 +827,8 @@ public:
             // assert(
             //     ((minvalues[i] > 0) && (C[i] > INT_MAX - minvalues[i])) ||
             //     ((minvalues[i] < 0) && (C[i] < INT_MIN - minvalues[i])));
-            if (res > minvalues[i] + 4 * rho[i] + C[i])
-                res = minvalues[i] + 4 * rho[i] + C[i];
+            if (res > minvalues[i] - 4 * rho[i] - C[i])
+                res = minvalues[i] - 4 * rho[i] - C[i];
         }
 
         return res;
@@ -835,32 +836,37 @@ public:
 
     int compute(int &a)
     {
+        Timer t;
         if (num_nodes == 1)
             return 0;
 
         int res = INT_MAX;
+        t.Start();
         InitializeWeight();
-
-        // cout << "Incomparablecut: " << IncomparableCut() << endl;
-        // cout << "Comparablecut: " << ComparableCut() << endl;
+        t.Stop();
+        // PrintStep('InitializeWeight', t.Seconds());
         int c1 = IncomparableCut();
         int c2 = ComparableCut();
-        int tmp = min(c1, c2);
-        //debug
+        int tmp;
+        if (c1 > 0 && c2 > 0)
+            tmp = min(c1, c2);
+        else if(c1 > 0 && c2 < 0)
+            tmp = c1;
+        else
+            tmp = c2;
+
         if (tmp == c1)
             a = 1;
         else
             a = 2;
         if (res > tmp && tmp > 0)
             res = tmp;
-        // cout << "C[i]: " << endl;
+
         for (int i = 0; i < num_nodes; i++)
         {
-            // cout << C[i] << " ";
             if (C[i] < res && C[i] > 0)
                 res = C[i], a = 3;
         }
-        // cout << endl;
         // cout << c1 << " " << c2 << " " << res << endl;
         return res;
     }

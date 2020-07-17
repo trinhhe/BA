@@ -1,0 +1,16 @@
+Graph has 1024 nodes and 3063 undirected edges for degree: 2
+b: 2245.8
+Mincut Upperbound estimate: 3
+treshold for packing value: 31441.2
+starting p: 748.599
+Packing takes:                 1.04074
+H size: 3063   p: 748.599     packing value: 1.98659     packing size/packing iterations: 1196
+sampling takes:                 0.00155
+trees generator:                                                           1.04817
+spanntrees: 163
+cut values of sampled trees: 
+3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 
+min compute:                                                              11.65153
+res: 3 solution of: 3
+Trial Time:          12.96554
+Average Time:        12.96554

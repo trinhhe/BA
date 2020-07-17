@@ -1,0 +1,13 @@
+Graph has 8192 nodes and 98304 undirected edges for degree: 12
+Mincut Upperbound estimate: 67108864
+treshold for packing value: 2459.98
+starting p: 3.14199e-05
+Packing takes:                67.19137
+H size: 50656   p: 0.514784     packing value: 4.78792     packing size/packing iterations: 3890
+Packing takes:                85.79912
+H size: 98304   p: 1.02957     packing value: 7.52112     packing size/packing iterations: 2626
+sampling takes:                 0.00533
+trees generator:                                                         153.37527
+spanntrees: 212
+Trial Time:          155.15840
+Average Time:        155.15840
