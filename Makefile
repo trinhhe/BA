@@ -18,7 +18,7 @@ ifneq ($(SERIAL), 1)
 endif
 
 # KERNELS = bc bfs cc cc_sv pr sssp tc mincut
-KERNELS = mincut mincut1 mincut2 mincut3
+KERNELS = mincut1 mincut2 mincut3 mincut4
 SUITE = $(KERNELS) converter
 
 .PHONY: all

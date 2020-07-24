@@ -207,13 +207,13 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<int, int>> &t
 
 pair<double, pvector<pvector<int> *>> PackingWeight(
     const pvector<WEdge> &H, pvector<pair<int, int>> &remaining_capacity,
-    double eps, int n, int m, vector<double> &tree_weights)
+    double eps, int n, int m, int M, vector<double> &tree_weights)
 {
     //pair contains the edge id with its turn_number
     vector<pair<int, int>> turn_number;
     turn_number.reserve(m);
     double packing_value = 0;
-    double inc = (eps * eps) / (3 * log(m));
+    double inc = (eps * eps) / (3 * log(M));
     // cout << inc << endl;
     // default_random_engine gen(time(NULL));
     pair<double, pvector<pvector<int> *>> res;
@@ -222,7 +222,6 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
         turn_number.push_back(make_pair(0, i));
 
     bool stop = false;
-    // int iteration = 0;
     while (true)
     {
         pvector<int> *T = KruskalWithLoad(H, turn_number, n);
@@ -239,11 +238,11 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
         for (auto i : *T)
         {
             remaining_capacity[i].second -= smallest_remaining_capacity;
-            if (remaining_capacity[i].second <= 0)
+            if (remaining_capacity[i].second == 0)
             {
                 turn_number[i].first++;
                 remaining_capacity[i].second = remaining_capacity[i].first;
-                if (turn_number[i].first >= (3 * log(m)) / (eps * eps))
+                if (turn_number[i].first >= (3 * log(M)) / (eps * eps) - 1)
                     stop = true;
             }
         }
@@ -258,6 +257,28 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
         }
     }
 }
+
+// double binomial(int trials, int weight_cap, double p, default_random_engine gen)
+// {
+//     const double max_allowed_deviation = 1e-10;
+//     if (p > 1 - max_allowed_deviation)
+//         return min(trials, weight_cap);
+//     uniform_real_distribution<double> distribution(0.0, 1.0);
+//     double u = distribution(gen);
+
+//     double prob = pow(1 - p, trials);
+//     double cum_prob = prob;
+//     for (int i = 0; i <= trials; ++i)
+//     {
+//         if (i >= weight_cap)
+//             return weight_cap;
+//         if (cum_prob >= u - max_allowed_deviation)
+//             return i;
+        
+//         prob *= (double)(trials - i) / (i + 1) * p / (1 - p);
+//         cum_prob += prob;
+//     }
+// }
 
 pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &trees, double sum_of_weight, vector<double> &tree_weights)
 {
@@ -287,26 +308,25 @@ pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &t
 }
 
 //if choise = true, estimate with summed weight of a vertex, else minimum weight of a maximum spanning tree
-int getUpperbound (const WGraph &g, const pvector<WEdge> &G, bool choice)
+int getUpperbound (const WGraph &g, const pvector<WEdge> &G)
 {
     int res = numeric_limits<int>::max();
-    if (choice)
+    int tmp;
+    for(auto i : g.vertices())
     {
-        for(auto i : g.vertices())
-        {
-            int tmp = 0;
-            for (auto j : g.out_neigh(i))
-                tmp += j.w;
-            res = min(res,tmp);
-        }
+        tmp = 0;
+        for (auto j : g.out_neigh(i))
+            tmp += j.w;
+        res = min(res,tmp);
     }
-    else
-    {
-        int n = g.num_nodes();
-        pvector<WEdge> t = Kruskal(G, n, false);
-        res = t[n - 2].v.w;
-        res *= (n * n);
-    }
+    
+   
+    int n = g.num_nodes();
+    pvector<WEdge> t = Kruskal(G, n, false);
+    tmp = t[n - 2].v.w;
+    tmp *= (n * n);
+    res = min(res,tmp);
+    
     
     return res;
 }
@@ -317,20 +337,21 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
     assert((1.0 - eps2) / (1.0 + eps1) > 2.0 / 3.0);
     double f = 3.0 / 2.0 - (1.0 + eps1) / (1.0 - eps2);
     assert(f > 0);
-    // double b = 3.0 * (d + 2.0) * log(n) / (eps1 * eps1);
     double b = ((2 + eps1) * (d + 2.0) * log(n)) / (eps1 * eps1);
-    // int weight_cap = ceil((1.0 + eps1) * 12.0 * b);
     int weight_cap = ceil((1.0 + eps1) * 2.0 * b);
     int c_dash;
     bool lastrun = 0;
+    default_random_engine gen;
+    // default_random_engine gen(time(NULL));
     const double max_allowed_deviation = 1e-10;
     //Upper bound approximation for mincut value
-    c_dash = getUpperbound(g, G, false);
-    
-    cout << "b: " << b << endl;
-    cout << "Mincut Upperbound estimate: " << c_dash << endl;
-    cout << "treshold for packing value: " << b * (1 + eps1) << endl;
-    cout << "starting p: " << b / c_dash << endl;
+    c_dash = getUpperbound(g, G);
+
+    //console
+    cout << c_dash << ", ";
+    cout << b * (1 + eps1) << ", ";
+    //console
+
     while (true)
     {
         //WEdge
@@ -339,19 +360,24 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
         pvector<pair<int, int>> remaining_capacity;
         //edge_id[i] = corresponding edge id of G in H
         pvector<int> edge_id;
+        int M = 0;
+        int weight;
         H.reserve(m);
         remaining_capacity.reserve(m);
         edge_id.reserve(m);
 
         double p = b / c_dash;
-        default_random_engine gen;
-        // default_random_engine gen(time(NULL));
+        
         for (int i = 0; i < m; i++)
         {
-            binomial_distribution<int> dist(min(weight_cap, G[i].v.w), p);
-            int weight = dist(gen);
+            binomial_distribution<int> dist(G[i].v.w, p);
+            weight = dist(gen);
+            if(weight > weight_cap)
+                weight = weight_cap;
+            // int weight = binomial(G[i].v.w, weight_cap, p, gen);
             if (weight != 0)
             {
+                M += weight;
                 edge_id.push_back(i);
                 H.push_back(WEdge(G[i].u, WNode(G[i].v.v, weight)));
                 remaining_capacity.push_back(make_pair(weight, weight));
@@ -370,10 +396,11 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             tree_weights.reserve(m + n * log(n) * log(n));
             //contains packing value and all trees
             t1.Start();
-            pair<double, pvector<pvector<int> *>> res = PackingWeight(H, remaining_capacity, eps2, n, H.size(), tree_weights);
+            pair<double, pvector<pvector<int> *>> res = PackingWeight(H, remaining_capacity, eps2, n, H.size(), M, tree_weights);
             t1.Stop();
-            PrintStep("Packing takes: ", t1.Seconds());
-            cout << "H size: " << H.size() << "   p: " << p << "     packing value: " << res.first << "     packing size/packing iterations: " << res.second.size() << endl;
+            //console
+            cout << "\"" << H.size() << " " << p << " " << t1.Seconds() << " " << res.first << " " << res.second.size() << " ; ";
+            //console
             if (res.first < b * (1 + eps1))
                 c_dash /= 2.0;
             else
@@ -383,10 +410,10 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             {
                 int number_of_trees = ceil(-d * log(n) / log(1 - f));
                 pvector<pvector<int> *> tmp;
-                t1.Start();
                 tmp = sampling(number_of_trees, res.second, res.first, tree_weights);
-                t1.Stop();
-                PrintStep("sampling takes: ", t1.Seconds());
+                //console
+                cout << "\", " << tmp.size() << ", ";
+                //console
                 pvector<pvector<WEdge> *> trees;
                 trees.reserve(tmp.size());
                 for (auto i : tmp)
@@ -412,7 +439,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
 
 size_t MinCut(const WGraph &g)
 {
-
+    t2.Start();
     assert(g.num_edges() > 0);
     int m = g.num_edges();
     int n = g.num_nodes();
@@ -435,11 +462,15 @@ size_t MinCut(const WGraph &g)
     double eps1 = 1.0 / 6.0;
     double eps2 = 1.0 / 5.0;
 
+    //console
+    cout << n << "," << m << ",";
+    //console
+
     t.Start();
     pvector<pvector<WEdge> *> tmp = SpanningTreesGenerator(g, G, 1.0, eps1, eps2, n, m);
     t.Stop();
-    PrintStep("trees generator:                                           ", t.Seconds());
-    // t.Start();
+    cout << t.Seconds() << " \n";
+
     pvector<SpanTree *> trees;
     trees.reserve(tmp.size());
     // vector of csr_trees to keep them in scope
@@ -452,9 +483,6 @@ size_t MinCut(const WGraph &g)
         trees.push_back(xd);
         delete it;
     }
-    // t.Stop();
-    // PrintStep("build csr graphs, spantree construct and pathsegmentation: ", t.Seconds());
-    cout << "spanntrees: " << tmp.size() << endl;
 
     // t.Start();
     int res = numeric_limits<int>::max();
@@ -463,18 +491,17 @@ size_t MinCut(const WGraph &g)
     // cout << "cut values of sampled trees: " << endl;
     // for (auto i : trees)
     // {
-    //     // cout << "#tree: " << j << endl;
     //     int tmp = i->compute(which_solution);
-    //     cout << tmp << " ";
+    //     // cout << tmp << " ";
     //     if (res > tmp)
     //         res = tmp;
     // }
-    // cout << endl;
     // t.Stop();
     // PrintStep("min compute:                                               ", t.Seconds());
     for (auto i : trees)
         delete i;
-    // cout << "res: " << res << " solution of: " << which_solution << endl;
+    // cout << endl << "res: " << res << " solution of: " << which_solution << endl;
+    t2.Stop();
     return res;
 }
 
@@ -563,23 +590,7 @@ int main(int argc, char *argv[])
     WeightedBuilder b(cli);
     WGraph g = b.MakeGraph();
     // g.PrintTopology();
-    // pvector<WEdge> G(g.num_edges());
-    // int j = 0;
-    // for (NodeID u : g.vertices())
-    // {
-    //     for (WNode wn : g.out_neigh(u))
-    //     {
-    //         // assert(wn.w > 0);
-    //         if (u < wn.v)
-    //         {
-    //             G[j] = WEdge(u, wn);
-    //             j++;
-    //         }
-    //     }
-    // }
-    // cout << g.num_nodes() << ' ' << g.num_edges() << endl;
-    // for (auto i : G)
-    //     cout << i.u << " " << i.v << endl;
+    
     if (g.directed())
     {
         cout << "Input graph is directed but we only consider undirected graphs" << endl;
@@ -590,5 +601,10 @@ int main(int argc, char *argv[])
         cout << "Input graph is not connected" << endl;
         return -2;
     }
+
+    //console
+    cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time\n";
+    //console
+
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
 }

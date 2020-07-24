@@ -1,0 +1,2 @@
+nodes, edges, mincut estimate, packing treshold, "H size, p, packing time, packing value, packing size", sample size, trees generator time
+4096,49152,15, 2270.75, "49152 129.757 18.5673 1.33917 1085 ; ", 196, 18.6221 

@@ -37,7 +37,6 @@ Requires input graph:
 Other than symmetrizing, the rest of the requirements are done by SquishCSR
 during graph building.
 
-packing improvement idea 1
 */
 
 using namespace std;

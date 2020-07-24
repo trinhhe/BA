@@ -4,19 +4,17 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/.."
 
-# GRAPHS=("barabasi_albert_3" "barabasi_albert_9" "erdos_renyi_Ntimes15" "erdos_renyi_Ntimes60" "watts_strogatz_8_0.3" "watts_strogatz_24_0.3")
-GRAPHS=("barabasi_albert_9")
+# GRAPHS=("barabasi_albert_9" "erdos_renyi_Ntimes5" "watts_strogatz_24_0.3" "random_partition_graph_0.25_1div4n")
+GRAPHS=("random_partition_graph_0.25_1div4n")
 for G in "${GRAPHS[@]}";
 do
-    for file in ${DIR}/test/graphs/weighted/${G}/*
+    for file in ${DIR}/test/graphs/unweighted/${G}/*
     do
         OUT=${file##*/}
-        # ${DIR}/mincut2 -sf "$file" -n1 > ../test/out/mincut2/weighted/${G}/${OUT%.wel}
-        ${DIR}/mincut1 -sf "$file" -n1 > ../test/out/mincut1/weighted/${G}/${OUT%.wel}
-        # ${DIR}/mincut3 -sf "$file" -n1 > ../test/out/mincut3/weighted/${G}/${OUT%.wel}
-
-        # ${DIR}/mincut1 -sf "$file" -n1 > ../test/out/mincut1/weighted/${G}/${OUT%.wel}
-        # ${DIR}/mincut2 -sf "$file" -n1 > ../test/out/mincut2/weighted/${G}/${OUT%.wel}
+        # ${DIR}/mincut1 -sf "$file" -n1 > ../test/out/mincut1/unweighted/${G}/${OUT%.wel}.csv
+        # ${DIR}/mincut2 -sf "$file" -n1 > ../test/out/mincut2/unweighted/${G}/${OUT%.wel}.csv
+        ${DIR}/mincut3 -sf "$file" -n1  > ../test/out/mincut3/unweighted/${G}/${OUT%.wel}.csv
+        ${DIR}/mincut4 -sf "$file" -n1  > ../test/out/mincut4/unweighted/${G}/${OUT%.wel}.csv
 
     done
 done

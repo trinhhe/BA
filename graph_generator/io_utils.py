@@ -2,6 +2,8 @@
 
 import networkx as nx
 import os
+import numpy as np
+import math
 from random import randint
 
 def set_weights(G, weight):
@@ -12,6 +14,12 @@ def set_weights(G, weight):
 def randomize_weights(G, max):
     for (u,v,w) in G.edges(data=True):
         w['weight'] = randint(1, max)
+    return G
+
+def randomize_weights_normal_distribution(G, mean):
+    mu, sigma = mean, 5
+    for(u,v,w) in G.edges(data=True):
+        w['weight'] = math.ceil(np.random.normal(mu, sigma))
     return G
 
 def print_graph(G):
