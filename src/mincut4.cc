@@ -358,7 +358,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
     const double max_allowed_deviation = 1e-10;
     //Upper bound approximation for mincut value
     c_dash = getUpperbound(g, G);
-
+    int c_start_estimate = c_dash;
     //console
     cout << c_dash << ", ";
     cout << b * (1 + eps1) << ", ";
@@ -413,7 +413,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             else
                 eps2_dash = eps2;
             t1.Start();
-            pair<double, pvector<pvector<int> *>> res = PackingWeight(H, remaining_capacity, eps1, eps2_dash, n, H.size(), M, tree_weights, c_dash, f, p, b);
+            pair<double, pvector<pvector<int> *>> res = PackingWeight(H, remaining_capacity, eps1, eps2_dash, n, H.size(), M, tree_weights, c_start_estimate, f, p, b);
             t1.Stop();
             //console
             cout << "\"" << H.size() << " " << p << " " << t1.Seconds() << " " << res.first << " " << res.second.size() << " ; ";
