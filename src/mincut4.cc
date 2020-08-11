@@ -209,14 +209,14 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<int, int>> &t
 
 pair<double, pvector<pvector<int> *>> PackingWeight(
     const pvector<WEdge> &H, pvector<pair<int, int>> &remaining_capacity, double eps1,
-    double eps2, int n, int m, int M, vector<double> &tree_weights, int c, double f, double p, double b)
+    double eps2, int n, int m, int M, pvector<double> &tree_weights, int c, double f, double p, double b)
 {
     //pair contains the edge id with its turn_number
     vector<pair<int, int>> turn_number;
     turn_number.reserve(m);
     double packing_value = 0;
-    double inc = (eps2 * eps2) / (3 * log(M));
-    int iteration = 0;
+    double inc = (eps2 * eps2) / (3.0 * log(M));
+    double iteration = 0;
     //maximal turn number over all edges
     int turn_max = 0;
     pair<double, pvector<pvector<int> *>> res;
@@ -248,7 +248,7 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
                 if (turn_number[i].first > turn_max)
                     turn_max = turn_number[i].first;
                 remaining_capacity[i].second = remaining_capacity[i].first;
-                if (turn_number[i].first >= (3 * log(M)) / (eps2 * eps2) - 1)
+                if (turn_number[i].first >= (3.0 * log(M)) / (eps2 * eps2) - 1)
                     stop = true;
             }
         }
@@ -259,11 +259,11 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
         {
             stop = true;
             for (size_t i = 0; i < tree_weights.size(); i++)
-                tree_weights[i] = 1 / turn_max;
+                tree_weights[i] = 1 / (double) turn_max;
+            packing_value = iteration / turn_max;
         }
         if (stop)
         {
-            // cout << "packing iterations: " << iteration << endl;
             res.first = packing_value;
             return res;
         }
@@ -292,26 +292,24 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
 //     }
 // }
 
-pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &trees, double sum_of_weight, vector<double> &tree_weights)
+//without replacement
+pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &trees, double sum_of_weight, pvector<double> &tree_weights, default_random_engine g)
 {
     if (trees.size() < (size_t)number_of_trees)
         return pvector<pvector<int> *>(trees.begin(), trees.end());
 
-    // uniform_int_distribution<int> distribution(0, trees.size());
-    discrete_distribution<int> dist(tree_weights.begin(), tree_weights.end());
+    // discrete_distribution<int> dist(tree_weights.begin(), tree_weights.end());
     pvector<pvector<int> *> sampled_trees;
-    default_random_engine g;
-    // default_random_engine g(time(NULL));
     pvector<bool> visited(trees.size(), 0);
     sampled_trees.reserve(number_of_trees);
     for (int i = 0; i < number_of_trees; i++)
     {
+        discrete_distribution<int> dist(tree_weights.begin(), tree_weights.end());
         int tree = dist(g);
-        // cout << tree << " ";
         sampled_trees.push_back(trees[tree]);
         visited[tree] = 1;
+        tree_weights[tree] = 0;
     }
-    // cout << endl;
     for (size_t i = 0; i < visited.size(); i++)
         if (!visited[i])
             delete trees[i];
@@ -361,7 +359,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
     int c_start_estimate = c_dash;
     //console
     cout << c_dash << ", ";
-    cout << b * (1 + eps1) << ", ";
+    cout << b * (1 + eps1) << ", \"";
     //console
 
     while (true)
@@ -404,7 +402,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
 
         if (H.size() != 0 && connected)
         {
-            vector<double> tree_weights;
+            pvector<double> tree_weights;
             tree_weights.reserve(m + n * log(n) * log(n));
             //contains packing value and all trees
             double eps2_dash;
@@ -416,7 +414,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             pair<double, pvector<pvector<int> *>> res = PackingWeight(H, remaining_capacity, eps1, eps2_dash, n, H.size(), M, tree_weights, c_start_estimate, f, p, b);
             t1.Stop();
             //console
-            cout << "\"" << H.size() << " " << p << " " << t1.Seconds() << " " << res.first << " " << res.second.size() << " ; ";
+            cout << H.size() << " " << p << " " << t1.Seconds() << " " << res.first << " " << res.second.size() << " ; ";
             //console
             if (res.first < b * (1 + eps1))
                 c_dash /= 2.0;
@@ -427,7 +425,8 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             {
                 int number_of_trees = ceil(-d * log(n) / log(1 - f));
                 pvector<pvector<int> *> tmp;
-                tmp = sampling(number_of_trees, res.second, res.first, tree_weights);
+                tmp = sampling(number_of_trees, res.second, res.first, tree_weights, gen);
+                // pvector<pvector<int> *> tmp(res.second.begin(), res.second.end());
                 //console
                 cout << "\", " << tmp.size() << ", ";
                 //console
@@ -484,11 +483,12 @@ size_t MinCut(const WGraph &g)
     t.Start();
     pvector<pvector<WEdge> *> tmp = SpanningTreesGenerator(g, G, 1.0, eps1, eps2, n, m);
     t.Stop();
-    //console
-    // cout << t.Seconds() << ", \"";
-    cout << t.Seconds() << " ";
 
     //console
+    cout << t.Seconds() << ", \"";
+    // cout << t.Seconds() << " ";
+    //console
+
     pvector<SpanTree *> trees;
     trees.reserve(tmp.size());
     // vector of csr_trees to keep them in scope
@@ -501,29 +501,32 @@ size_t MinCut(const WGraph &g)
         trees.push_back(xd);
         delete it;
     }
-
+    //REMOVE
+    cout << endl;
+    //REMOVE
     t.Start();
     int res = numeric_limits<int>::max();
     // 1,2,3 indiciates incomparablecut, comparablecut or 1-respect mincut
-    // int which_solution = 0;
-    // for (auto i : trees)
-    // {
-    //     int tmp = i->compute(which_solution);
-    //     cout << tmp << " ";
-    //     if (res > tmp)
-    //         res = tmp;
-    // }
-    // //console
-    // cout << "\", \"" << res << " ";
-    // console
+    int which_solution = 0;
+    for (auto i : trees)
+    {
+        int tmp = i->compute(which_solution);
+        cout << tmp << " ";
+        if (res > tmp)
+            res = tmp;
+    }
+    
     t.Stop();
-    // PrintStep("min compute:                                               ", t.Seconds());
     for (auto i : trees)
         delete i;
 
     // cout << endl << "res: " << res << " solution of: " << which_solution << endl;
     t2.Stop();
-    // cout << t2.Seconds();
+
+    //console
+    cout << "\", "<< t.Seconds() << ", " << t2.Seconds() << ", " << "\"" << res << " ";
+    // console
+
     return res;
 }
 
@@ -601,7 +604,7 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
     }
     // if (mincut != test_min)
     //     cout << mincut << " != " << test_min << endl;
-    cout << mincut << "\"";
+    cout << mincut << "\"\n";
     return mincut == test_min;
 }
 
@@ -625,8 +628,8 @@ int main(int argc, char *argv[])
         return -2;
     }
     //console
-    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, cut values of sampled trees, end result vs correct result\n";
-    cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time\n";
+    cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, cut values of sampled trees, mincut computation time, overall time, end result vs correct result\n";
+    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time\n";
     //console
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
 }

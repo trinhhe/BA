@@ -61,13 +61,32 @@ class SpanTree
     vector<int> C;
     //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
     vector<int> rho;
+    //help vectors for LCA queries
+    pvector<NodeID> levels;
+    pvector<NodeID> inlabel;
+    pvector<NodeID> ascendant;
+    unordered_map<int, int> head_;
+    //postorder[i] stores the node visited on postorder iteration i (needed for computing treefix sum)
+    pvector<NodeID> postorder;
 
 public:
     // CONSTRUCTORS //
 
+    SpanTree(const WGraph &G, const WGraph &T, int root, int num_nodes, int num_paths, pvector<NodeID> &parent, 
+        pvector<NodeID> &path_id, pvector<NodeID> &path, pvector<NodeID> &head, pvector<NodeID> &minpathPos, pvector<PathID> &lengths) : 
+        graph(G), tree(T), root(root),num_nodes(num_nodes), num_paths(num_paths), parent(parent.begin(), parent.end()), path_id(path_id.begin(), path_id.end()), path(path.begin(), 
+        path.end()), head(head.begin(), head.end()), minpathPos(minpathPos.begin(), minpathPos.end()), lengths(lengths.begin(), lengths.end()), C(num_nodes), rho(num_nodes, 0), levels(num_nodes), inlabel(num_nodes), ascendant(num_nodes), postorder(num_nodes)
+    {
+        P.reserve(num_paths);
+        for (int i = 0; i < num_paths; i++)
+        {
+            P.push_back(new MinimumPath(lengths[i]));
+        }
+    }
+
     SpanTree(const WGraph &G, const WGraph &T) : graph(G), tree(T), num_nodes(G.num_nodes()), num_paths(0), parent(num_nodes, -1),
                                                  path_id(num_nodes, -1), path(num_nodes), head(num_nodes), minpathPos(num_nodes),
-                                                 C(num_nodes), rho(num_nodes, 0)
+                                                 C(num_nodes), rho(num_nodes, 0), levels(num_nodes), inlabel(num_nodes), ascendant(num_nodes), postorder(num_nodes)
     {
         PathSegmentation();
         P.reserve(num_paths);
@@ -76,6 +95,7 @@ public:
             P.push_back(new MinimumPath(lengths[i]));
         }
     }
+
 
     ~SpanTree()
     {
@@ -99,14 +119,14 @@ public:
         }
         cout << "num_paths: " << num_paths << endl;
         cout << "root: " << root << endl;
-        cout << "P: " << endl;
-        int j = 0;
-        for (auto i : P)
-        {
-            cout << "Path ID: " << j++ << endl;
-            i->print();
-            cout << endl;
-        }
+        // cout << "P: " << endl;
+        // int j = 0;
+        // for (auto i : P)
+        // {
+        //     cout << "Path ID: " << j++ << endl;
+        //     i->print();
+        //     cout << endl;
+        // }
         cout << "------------------------------------------" << endl;
     }
     void printpath()
@@ -280,11 +300,8 @@ public:
         //preprocessing O(n) to query LCA in O(1)
         pvector<bool> visited(num_nodes, false);
         pvector<int> preorder(num_nodes);
-        pvector<int> levels(num_nodes);
         pvector<int> sizes(num_nodes);
-        pvector<int> inlabel(num_nodes);
-        pvector<int> ascendant(num_nodes);
-        unordered_map<int, int> head_;
+        
         int index = 1;
         PreOrder(root, index, 0, preorder, levels, sizes, visited);
 
@@ -311,10 +328,6 @@ public:
 
         //delta[i] holds weight of all edges of the descandants
         vector<NodeID> delta(num_nodes, 0);
-        //rho[i] holds weight of all edges of the descandants where both endpoints share i as lca
-        // pvector<NodeID> rho(num_nodes, 0);
-        //postorder[i] stores the node visited on postorder iteration i (needed for computing treefix sum)
-        pvector<NodeID> postorder(num_nodes);
         PostOrder(root, postorder);
 
         for (NodeID v : graph.vertices())
@@ -674,6 +687,7 @@ public:
                             }
                     }
                 }
+                adj[curr].clear();
                 if (head[curr] != root && degree[parent[head[curr]]] == 1 && path[parent[head[curr]]] == -1)
                     leaves.insert(parent[head[curr]]);
             }
@@ -709,14 +723,16 @@ public:
         list<WNode>::iterator it1;
         list<WNode>::iterator it2;
 
+        int pos_inf = (int)2.5e8;
+
         //store smallest value from MinPath queries
-        pvector<NodeID> minvalues(num_nodes, INT_MAX);
+        vector<NodeID> minvalues(num_nodes, INT_MAX);
         //visited[i] = NodeID i is true indicates to to ignore all edges which have i as a node (contract edges)
-        pvector<NodeID> visited(num_nodes, 0);
+        vector<NodeID> visited(num_nodes, 0);
         //keep track which nodes to contract after bough-phase
         queue<NodeID> to_remove;
         //keep track of vertex degrees to decide the leaves in next bough phase
-        pvector<NodeID> degree(num_nodes);
+        vector<NodeID> degree(num_nodes);
         // leaves in current bough phase
         std::set<NodeID> leaves;
         for (NodeID i = 0; i < num_nodes; i++)
@@ -727,12 +743,15 @@ public:
                 leaves.insert(i);
         }
         int iterator = num_paths;
+        //do not consider C(root) 
+        AddPath(root, pos_inf);
         while (iterator > 0)
         {
             for (NodeID v : leaves)
             {
                 //keep track of the order of vertex in a bough to revert the AddPath operations
                 stack<pair<NodeID, int>> stack;
+
                 for (; head[v] != v; v = parent[v])
                 {
                     degree[v] -= 2;
@@ -743,7 +762,7 @@ public:
                         stack.push(make_pair(x, 2 * x.w));
                         AddPath(x, 2 * x.w);
                     }
-                    minvalues[v] = MinPath(v);
+                    minvalues[v] = MinPath(parent[v]);
                 }
 
                 //include head vertex of bough too
@@ -755,10 +774,12 @@ public:
                     stack.push(make_pair(x, 2 * x.w));
                     AddPath(x, 2 * x.w);
                 }
-                minvalues[v] = MinPath(v);
-                // "remove" edge to head of vertex, later on all nodes with degree = 1 will be new leaves
-                if (v != root)
+                if(v != root){
+                    minvalues[v] = MinPath(parent[v]);
+                    // "remove" edge to head of vertex, later on all nodes with degree = 1 will be new leaves
                     degree[parent[v]]--;
+                }
+                    
                 //reverse operations
                 while (!stack.empty())
                 {
@@ -803,12 +824,28 @@ public:
                             }
                     }
                 }
+                adj[curr].clear();
                 if (head[curr] != root && degree[parent[head[curr]]] == 1 && path[parent[head[curr]]] == -1)
                     leaves.insert(parent[head[curr]]);
             }
             //one node left after contractions which is the root
             if (iterator == 1 && leaves.empty())
                 leaves.insert(root);
+            
+            //recompute rho values for nodes after contraction which are still needed
+            for (int i = 0; i < num_nodes; i++)
+                if(!visited[i])
+                    rho[i] = 0;
+            for (int v = 0; v < num_nodes; v++)
+                for (it1 = adj[v].begin(); it1 != adj[v].end(); it1++)
+                    if (v < it1->v)
+                    {
+                        NodeID z = LCA_Query(it1->v, v, inlabel, ascendant, levels, head_);
+                        rho[z] += it1->w;
+                    }
+            for (NodeID v : postorder)
+                if (v != root && !visited[v])
+                    rho[parent[v]] += rho[v];
         }
 
         int res = INT_MAX;
@@ -834,7 +871,7 @@ public:
         return res;
     }
 
-    int compute(int &a)
+    int compute()
     {
         Timer t;
         if (num_nodes == 1)
@@ -844,6 +881,7 @@ public:
         t.Start();
         InitializeWeight();
         t.Stop();
+        // print();
         // PrintStep('InitializeWeight', t.Seconds());
         int c1 = IncomparableCut();
         int c2 = ComparableCut();
@@ -854,20 +892,25 @@ public:
             tmp = c1;
         else
             tmp = c2;
-
-        if (tmp == c1)
-            a = 1;
-        else
-            a = 2;
         if (res > tmp && tmp > 0)
             res = tmp;
-
+        // int lol = INT_MAX;
+        // int index;
+        // cout << "C(V): ";
         for (int i = 0; i < num_nodes; i++)
         {
-            if (C[i] < res && C[i] > 0)
-                res = C[i], a = 3;
+            // cout << C[i] << " ";
+            if (C[i] < res && C[i] != 0)
+                res = C[i];
+            // if (C[i] < lol && C[i] != 0)
+            //     lol = C[i], index = i;
         }
+        //console
+        // cout << "values " <<lol << " " << index << " ";
         // cout << c1 << " " << c2 << " " << res << endl;
+        //console
+
+        // print();
         return res;
     }
 };

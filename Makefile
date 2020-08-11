@@ -17,8 +17,8 @@ ifneq ($(SERIAL), 1)
 	CXX_FLAGS += $(PAR_FLAG)
 endif
 
-# KERNELS = bc bfs cc cc_sv pr sssp tc mincut
-KERNELS = mincut1 mincut2 mincut3 mincut4
+KERNELS = mincut stoer_wagner mincut0
+# KERNELS = mincut mincut1 mincut2 mincut3 mincut4
 SUITE = $(KERNELS) converter
 
 .PHONY: all
