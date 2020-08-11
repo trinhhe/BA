@@ -327,6 +327,18 @@ public:
         // return bb.SquishGraph(tmp);
         return bb.MakeGraphFromEL(el);
     }
+
+    //make csrgraph from edgelist (Henry T.)
+    static CSRGraph<NodeID_, DestID_, invert> Load_CSR_From_Edgelist_Squished(EdgeList &el, bool symmetrize)
+    {
+        CLBase cli(0, NULL);
+        BuilderBase<NodeID_, DestID_, WeightT_> bb(cli);
+        bb.needs_weights_ = false;
+        bb.symmetrize_ = symmetrize;
+        auto tmp = bb.MakeGraphFromEL(el);
+        return bb.SquishGraph(tmp);
+        // return bb.MakeGraphFromEL(el);
+    }
 };
 
 #endif // BUILDER_H_

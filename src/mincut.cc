@@ -12,6 +12,7 @@
 #include <utility>
 #include <map>
 #include <set>
+#include "omp.h"
 
 #include "benchmark.h"
 #include "builder.h"
@@ -510,6 +511,7 @@ size_t MinCut(const WGraph &g)
     // 1,2,3 indiciates incomparablecut, comparablecut or 1-respect mincut
     // int which_solution = 0;
     // pvector<int> solutions(tmp.size());
+    cout << "max threads " << omp_get_max_threads() << endl;
 #pragma omp parallel for reduction(min:res)
     for(size_t i = 0; i < trees.size(); i++)
     {
@@ -641,7 +643,7 @@ int main(int argc, char *argv[])
         return -1;
     WeightedBuilder b(cli);
     WGraph g = b.MakeGraph();
-    cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges();
+    // cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges() << "\n";
     // g.PrintTopology();
 
     if (g.directed())
@@ -671,7 +673,7 @@ int main(int argc, char *argv[])
         for(size_t j=0; j < components.size(); j++)
         {
             if(components[j].size() > max_size)
-                component = j;
+                component = j, max_size = components[j].size();
         }
         //mapping to remove nodes which aren't in component such that all component nodes havhe ID from 0 to (component.size - 1)
         unordered_map<NodeID,NodeID> id_mapping;
@@ -682,15 +684,15 @@ int main(int argc, char *argv[])
                 if(i < j.v)
                     edgelist.push_back(WEdge(id_mapping[i],id_mapping[j]));
         
-         g = WeightedBuilder::Load_CSR_From_Edgelist(edgelist, true);
-         WeightedBuilder::RelabelByDegree(g);
+        g = WeightedBuilder::Load_CSR_From_Edgelist_Squished(edgelist, true);
+        cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges();
+        // g.PrintTopology();
     }
-    cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges();
-    // g.PrintTopology();
+    
     // assert(g.directed() == true);
     //console
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time\n";
     //console
-    // BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier); 
+    BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier); 
 }
