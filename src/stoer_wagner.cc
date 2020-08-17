@@ -33,7 +33,7 @@ int Stoer_Wagner(const WGraph &g)
     t.Start();
     int res = boost::stoer_wagner_min_cut(conn, weights);
     t.Stop();
-    cout << g.num_nodes() << ", " << g.num_edges() << ", "<< t.Seconds() << "\n";
+    cout << g.num_nodes() << ", " << g.num_edges() << ", "<< res << ", " << t.Seconds() << "\n";
     return res;
 }
 

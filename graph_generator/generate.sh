@@ -45,7 +45,7 @@ do
     TMP=$((NUMBER_OF_GROUPS[i]*128))
     TMP2=`python3 -c "print(1/(4*${TMP}))"`
     ${DIR}/generate.py 'planted_partition_graph(L, K, PIN, POUT)' 1  -l ${NUMBER_OF_GROUPS[i]} -k 128 -pin 0.5 -pout ${TMP2} --weight 1 > ../../graphs/unweighted/planted_partition_128_0.5_1div4n/pp_${TMP}.graph
-    ${DIR}/generate.py 'planted_partition_graph(L, K, PIN, POUT)' 1  -l ${NUMBER_OF_GROUPS[i]} -k 128 -pin 0.5 -pout ${TMP2} --weight 100 --sigma 25 --randomize_normal > ../../graphs/weighted_100_25/planted_partition_128_0.5_1div4n/pp_${TMP}.graph
+    ${DIR}/generate.py 'planted_partition_graph(L, K, PIN, POUT)' 1  -l ${NUMBER_OF_GROUPS[i]} -k 128 -pin 0.5 -pout ${TMP2} --weight 100 --sigma 25 --randomize_normal > ../../graphs/weighted_100_30/planted_partition_128_0.5_1div4n/pp_${TMP}.graph
     ${DIR}/generate.py 'planted_partition_graph(L, K, PIN, POUT)' 1  -l ${NUMBER_OF_GROUPS[i]} -k 128 -pin 0.5 -pout ${TMP2} --weight 100 --sigma 5 --randomize_normal > ../../graphs/weighted_100_5/planted_partition_128_0.5_1div4n/pp_${TMP}.graph
 
 done

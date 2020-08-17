@@ -15,7 +15,23 @@ do
         ${DIR}/mincut0 -sf "$file" -n1 > ../outputs/mincut0/unweighted/${G}/${OUT%.graph}.csv
         ${DIR}/mincut -sf "$file" -n1 > ../outputs/mincut/unweighted/${G}/${OUT%.graph}.csv
         ${DIR}/stoer_wagner -sf "$file" -n1 > ../outputs/stoer/unweighted/${G}/${OUT%.graph}.csv
-        # ${DIR}/karger_stein "$file" 1 > ../outputs/karger/unweighted/${G}/${OUT%.graph}.csv
+        ${DIR}/karger_stein "$file" 1 > ../outputs/karger/unweighted/${G}/${OUT%.graph}.csv
+    done
+    for file in ${DIR}/../graphs/weighted_100_5/${G}/*
+    do
+        OUT=${file##*/}
+        ${DIR}/mincut0 -sf "$file" -n1 > ../outputs/mincut0/weighted_100_5/${G}/${OUT%.graph}.csv
+        ${DIR}/mincut -sf "$file" -n1 > ../outputs/mincut/weighted_100_5/${G}/${OUT%.graph}.csv
+        ${DIR}/stoer_wagner -sf "$file" -n1 > ../outputs/stoer/weighted_100_5/${G}/${OUT%.graph}.csv
+        ${DIR}/karger_stein "$file" 1 > ../outputs/karger/weighted_100_5/${G}/${OUT%.graph}.csv
+    done
+    for file in ${DIR}/../graphs/weighted_100_30/${G}/*
+    do
+        OUT=${file##*/}
+        ${DIR}/mincut0 -sf "$file" -n1 > ../outputs/mincut0/weighted_100_30/${G}/${OUT%.graph}.csv
+        ${DIR}/mincut -sf "$file" -n1 > ../outputs/mincut/weighted_100_30/${G}/${OUT%.graph}.csv
+        ${DIR}/stoer_wagner -sf "$file" -n1 > ../outputs/stoer/weighted_100_30/${G}/${OUT%.graph}.csv
+        ${DIR}/karger_stein "$file" 1 > ../outputs/karger/weighted_100_30/${G}/${OUT%.graph}.csv
     done
 done
 
