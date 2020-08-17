@@ -351,7 +351,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
         pvector<pair<int, int>> remaining_capacity;
         //edge_id[i] = corresponding edge id of G in H
         pvector<int> edge_id;
-        int M = 0;
+        long int M = 0;
         int weight;
         H.reserve(m);
         remaining_capacity.reserve(m);
@@ -370,6 +370,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             if (weight != 0)
             {
                 M += weight;
+                assert(M>0);
                 edge_id.push_back(i);
                 H.push_back(WEdge(G[i].u, WNode(G[i].v.v, weight)));
                 remaining_capacity.push_back(make_pair(weight, weight));
@@ -502,7 +503,7 @@ size_t MinCut(const WGraph &g)
     t2.Stop();
 
     //console
-    cout << t.Seconds() << ", " << t2.Seconds() << ", " << "\"" << res << " ";
+    cout << t.Seconds() << ", " << t2.Seconds() << "\n";
     // console
 
     return res;
@@ -586,6 +587,27 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
     return mincut == test_min;
 }
 
+void dfs_find_component_nodes(WGraph &g, int v, vector<bool> &visited, vector<vector<int>> &components)
+{
+    stack<int> st;
+    st.push(v);
+    while (!st.empty())
+    {
+        auto s = st.top();
+        st.pop();
+        if (!visited[s])
+        {
+            visited[s] = true;
+            components.back().push_back(s);
+        }
+        for (auto i : g.out_neigh(s))
+        {
+            if (!visited[i])
+                st.push(i);
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     CLApp cli(argc, argv, "mincut0");
@@ -600,14 +622,45 @@ int main(int argc, char *argv[])
         cout << "Input graph is directed but we only consider undirected graphs" << endl;
         return -2;
     }
+    //if disconnected make new graph with biggest component and compute on that
     if (!isConnected(g))
     {
-        cout << "Input graph is not connected" << endl;
-        return -2;
+        typedef vector<int> Component;
+        vector<Component> components;
+        vector<bool> visited(g.num_nodes(), false);
+        for(int i = 0; i < g.num_nodes(); i++)
+        {
+            if(!visited[i])
+            {
+                components.push_back(Component());
+                dfs_find_component_nodes(g, i, visited, components);
+            }
+        }
+        pvector<WEdge> edgelist;
+        edgelist.reserve(g.num_edges()/2);
+        size_t max_size = 0;
+        size_t component;
+        for(size_t j=0; j < components.size(); j++)
+        {
+            if(components[j].size() > max_size)
+                component = j, max_size = components[j].size();
+        }
+        //mapping to remove nodes which aren't in component such that all component nodes havhe ID from 0 to (component.size - 1)
+        unordered_map<NodeID,NodeID> id_mapping;
+        for(size_t i = 0; i < components[component].size(); i++)
+            id_mapping[components[component][i]] = i;
+        for(auto i : components[component])
+            for(auto j : g.out_neigh(i))
+                if(i < j.v)
+                    edgelist.push_back(WEdge(id_mapping[i],id_mapping[j]));
+        
+        g = WeightedBuilder::Load_CSR_From_Edgelist_Squished(edgelist, true);
+        // cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges();
+        // g.PrintTopology();
     }
     //console
-    cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
-    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time\n";
+    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
+    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time\n";
     //console
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
 }

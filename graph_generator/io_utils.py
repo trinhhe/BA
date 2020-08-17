@@ -6,26 +6,28 @@ import numpy as np
 import math
 from random import randint
 
-def set_weights(G, weight):
+def set_weights(G, weight, dummy):
     for (u,v,w) in G.edges(data=True):
         w['weight'] = weight
     return G
 
-def randomize_weights(G, max):
+def randomize_weights(G, max, dummy):
     for (u,v,w) in G.edges(data=True):
         w['weight'] = randint(1, max)
     return G
 
-def randomize_weights_normal_distribution(G, mean):
-    mu, sigma = mean, 5
+def randomize_weights_normal_distribution(G, mean, deviation):
+    mu, sigma = mean, deviation
     for(u,v,w) in G.edges(data=True):
         w['weight'] = math.ceil(np.random.normal(mu, sigma))
     return G
 
 def print_graph(G):
-    # print('{0} {1}'.format(nx.number_of_nodes(G), nx.number_of_edges(G)))
+    print('#') #adding a commet line since karger-stein doesn't run without a comment (out of bound error)
+    print('{0} {1}'.format(nx.number_of_nodes(G), nx.number_of_edges(G)))
     for (u,v,w) in G.edges(data=True):
         print('{0} {1} {2}'.format(u, v, w['weight']))
+        # print('{0}'.format(w['weight']))
 
 def read_stdin():
     first_line = input()

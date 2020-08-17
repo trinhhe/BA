@@ -371,7 +371,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
         pvector<pair<int, int>> remaining_capacity;
         //edge_id[i] = corresponding edge id of G in H
         pvector<int> edge_id;
-        int M = 0;
+        long int M = 0;
         int weight;
         H.reserve(m);
         remaining_capacity.reserve(m);
@@ -389,6 +389,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
             if (weight != 0)
             {
                 M += weight;
+                assert(M > 0);
                 edge_id.push_back(i);
                 H.push_back(WEdge(G[i].u, WNode(G[i].v.v, weight)));
                 remaining_capacity.push_back(make_pair(weight, weight));
@@ -511,7 +512,7 @@ size_t MinCut(const WGraph &g)
     // 1,2,3 indiciates incomparablecut, comparablecut or 1-respect mincut
     // int which_solution = 0;
     // pvector<int> solutions(tmp.size());
-    cout << "max threads " << omp_get_max_threads() << endl;
+    // cout << "max threads " << omp_get_max_threads() << endl;
 #pragma omp parallel for reduction(min:res)
     for(size_t i = 0; i < trees.size(); i++)
     {
@@ -531,7 +532,7 @@ size_t MinCut(const WGraph &g)
     t2.Stop();
 
     //console
-    cout << t.Seconds() << ", " << t2.Seconds() << ", " << "\"" << res << " ";
+    cout << t.Seconds() << ", " << t2.Seconds() << '\n';
     // console
 
     return res;
@@ -611,7 +612,7 @@ bool MINCUTVerifier(const WGraph &g, size_t test_min)
     }
     // if (mincut != test_min)
     //     cout << mincut << " != " << test_min << endl;
-    cout << mincut << "\"\n";
+    // cout << mincut << "\"\n";
     return mincut == test_min;
 }
 
@@ -651,8 +652,8 @@ int main(int argc, char *argv[])
         cout << "Input graph is directed but we only consider undirected graphs" << endl;
         return -2;
     }
-    //TODO if disconnected make new graph with biggest component and compute on that
-    
+
+    //if disconnected make new graph with biggest component and compute on that
     if (!isConnected(g))
     {
         typedef vector<int> Component;
@@ -685,14 +686,14 @@ int main(int argc, char *argv[])
                     edgelist.push_back(WEdge(id_mapping[i],id_mapping[j]));
         
         g = WeightedBuilder::Load_CSR_From_Edgelist_Squished(edgelist, true);
-        cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges();
+        // cout << "nodes: " << g.num_nodes() << " edges: " << g.num_edges();
         // g.PrintTopology();
     }
     
     // assert(g.directed() == true);
     //console
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
-    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time\n";
+    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, computation time, overall time\n";
     //console
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier); 
 }

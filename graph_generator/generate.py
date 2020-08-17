@@ -14,12 +14,13 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument('-w', '--weight', metavar='W', type=int, help='edge weight', default=100)
 parser.add_argument('-s', '--seed', metavar='S', type=int, help='randomization seed', default=1234)
+parser.add_argument('-sigma', '--sigma', metavar='DEVIATION', type=int, help='mean of normal distribution', default =5)
 parser.add_argument('--randomize', dest='set_weights', action='store_const',
 					const=io_utils.randomize_weights, default=io_utils.set_weights,
 					help='randomize edge weights uniformly within [1, W)')
 parser.add_argument('--randomize_normal', dest='set_weights', action='store_const',
                     const=io_utils.randomize_weights_normal_distribution, default=io_utils.set_weights,
-                    help='randomize edge weights normally with W as mean')
+                    help='randomize edge weights normally with W as mean and DEVIATION as sigma')
 parser.add_argument('graph', metavar='G', type=str, help='graph specification (e.g. complete_graph(N), ...)')
 parser.add_argument('N', metavar='N', type=int, help='vertex count')
 parser.add_argument('-m', '--edges', metavar='M', type=int, help='edge count', nargs='?')
@@ -30,12 +31,13 @@ parser.add_argument('-cs', '--clique_size', metavar='CS', type=int, help='clique
 parser.add_argument('-pl', '--partition_list', metavar='PL', type=int, help='size of groups (graph specific for random_partition',nargs='*')
 parser.add_argument('-pin', '--p_in', metavar='PIN', type=float, help='probability of edges with in groups (graph specific for random_partition',nargs='?')
 parser.add_argument('-pout', '--p_out', metavar='POUT', type=float, help='probability of edges between groups (graph specific for random_partition',nargs='?')
+parser.add_argument('-l', '--num_groups', metavar='L', type=int, help='number of groups (planted_partition_graph)', nargs='?')
 
 args = parser.parse_args()
 random.seed(args.seed)
 
-G = eval('nx.' + args.graph, {**globals(), **{'N': args.N, 'M': args.edges, 'P': args.prob, 'K': args.k, 'NC': args.num_cliques,'CS': args.clique_size, 'PL': args.partition_list, 'PIN': args.p_in, 'POUT': args.p_out}}, locals())
+G = eval('nx.' + args.graph, {**globals(), **{'N': args.N, 'M': args.edges, 'P': args.prob, 'K': args.k, 'NC': args.num_cliques,'CS': args.clique_size, 'PL': args.partition_list, 'PIN': args.p_in, 'POUT': args.p_out, 'L': args.num_groups}}, locals())
 
 # print('# {} {} {}'.format(datetime.datetime.now(), os.popen('git rev-parse HEAD').read().strip(), args))
-args.set_weights(G, args.weight)
+args.set_weights(G, args.weight, args.sigma)
 io_utils.print_graph(G)
