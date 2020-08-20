@@ -207,7 +207,7 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<double, int>>
 
 pair<double, pvector<pvector<int> *>> PackingWeight(
     const pvector<WEdge> &H, pvector<pair<int, int>> &remaining_capacity,
-    double eps, int n, int m, int M, pvector<double> &tree_weights)
+    double eps, int n, int m, long int M, pvector<double> &tree_weights)
 {
     //pair contains the edge id with its load
     vector<pair<double, int>> load;
@@ -302,13 +302,14 @@ pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &t
 //if choise = true, estimate with summed weight of a vertex, else minimum weight of a maximum spanning tree
 int getUpperbound (const WGraph &g, const pvector<WEdge> &G)
 {
-    int res = numeric_limits<int>::max();
-    int tmp;
+   long int res = numeric_limits<long int>::max();
+    long int tmp;
     for(auto i : g.vertices())
     {
         tmp = 0;
         for (auto j : g.out_neigh(i))
             tmp += j.w;
+        assert(tmp > 0);
         res = min(res,tmp);
     }
     
@@ -317,6 +318,7 @@ int getUpperbound (const WGraph &g, const pvector<WEdge> &G)
     pvector<WEdge> t = Kruskal(G, n, false);
     tmp = t[n - 2].v.w;
     tmp *= (n * n);
+    assert(tmp > 0);
     res = min(res,tmp);
     
     
@@ -331,7 +333,7 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
     assert(f > 0);
     double b = 3.0 * (d + 2.0) * log(n) / (eps1 * eps1);
     int weight_cap = ceil((1.0 + eps1) * 12.0 * b);
-    int c_dash;
+    long int c_dash;
     bool lastrun = 0;
     default_random_engine gen;
     // default_random_engine gen(time(NULL));
@@ -503,7 +505,7 @@ size_t MinCut(const WGraph &g)
     t2.Stop();
 
     //console
-    cout << t.Seconds() << ", " << t2.Seconds() << "\n";
+    cout << t.Seconds() << ", " << t2.Seconds() << ", "<< res << "\n";
     // console
 
     return res;
@@ -660,7 +662,7 @@ int main(int argc, char *argv[])
     }
     //console
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
-    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time\n";
+    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, res\n";
     //console
     BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
 }

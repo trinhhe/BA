@@ -19,7 +19,10 @@ def randomize_weights(G, max, dummy):
 def randomize_weights_normal_distribution(G, mean, deviation):
     mu, sigma = mean, deviation
     for(u,v,w) in G.edges(data=True):
-        w['weight'] = math.ceil(np.random.normal(mu, sigma))
+        x = math.ceil(np.random.normal(mu, sigma))
+        while x<=0:
+            x = math.ceil(np.random.normal(mu, sigma))
+        w['weight'] = x
     return G
 
 def print_graph(G):

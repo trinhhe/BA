@@ -1,3 +1,7 @@
 test/graphs
 ./cache
 ./vscode
+./mincut
+./mincut0
+./stoer_wagner
+./test_cut

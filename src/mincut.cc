@@ -205,18 +205,17 @@ pvector<int> *KruskalWithLoad(const pvector<WEdge> &H, vector<pair<int, int>> &t
 
 pair<double, pvector<pvector<int> *>> PackingWeight(
     const pvector<WEdge> &H, pvector<pair<int, int>> &remaining_capacity, double eps1,
-    double eps2, int n, int m, int M, pvector<double> &tree_weights, int c, double f, double p, double b)
+    double eps2, int n, int m, long int M, pvector<double> &tree_weights, int c, double f, double p, double b)
 {
     //pair contains the edge id with its turn_number
     vector<pair<int, int>> turn_number;
     turn_number.reserve(m);
     double packing_value = 0;
     double inc = (eps2 * eps2) / (3.0 * log(M));
-    double iteration = 0.0;
     //maximal turn number over all edges
     int turn_max = 0;
 
-    int total_multiplicity = 0;
+    long int total_multiplicity = 0;
     int multiplicity;
     pair<double, pvector<pvector<int> *>> res;
     res.second.reserve(m + n * log(n) * log(n));
@@ -227,7 +226,6 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
     while (true)
     {
         pvector<int> *T = KruskalWithLoad(H, turn_number, n);
-        iteration++;
         res.second.push_back(T);
         //update turn_number of edges contained in T
         int smallest_remaining_capacity = numeric_limits<int>::max();
@@ -254,7 +252,7 @@ pair<double, pvector<pvector<int> *>> PackingWeight(
         packing_value += smallest_remaining_capacity * inc;
         total_multiplicity += smallest_remaining_capacity;
         //stop criteria from idea 6
-        if (iteration/(turn_max+1) > c/(3-f/2) || (p < 1.0 && iteration/(turn_max+1) > b*(1 + eps1)))
+        if (total_multiplicity/(double)(turn_max+1) > c/(3-f/2) || (p < 1.0 && total_multiplicity/(double)(turn_max+1) > b*(1 + eps1)))
         {
             stop = true;
             for (size_t i = 0; i < tree_weights.size(); i++)
@@ -319,15 +317,16 @@ pvector<pvector<int> *> sampling(int number_of_trees, pvector<pvector<int> *> &t
 }
 
 //if choise = true, estimate with summed weight of a vertex, else minimum weight of a maximum spanning tree
-int getUpperbound (const WGraph &g, const pvector<WEdge> &G)
+long int getUpperbound (const WGraph &g, const pvector<WEdge> &G)
 {
-    int res = numeric_limits<int>::max();
-    int tmp;
+    long int res = numeric_limits<long int>::max();
+    long int tmp;
     for(auto i : g.vertices())
     {
         tmp = 0;
         for (auto j : g.out_neigh(i))
             tmp += j.w;
+        assert(tmp > 0);
         res = min(res,tmp);
     }
     
@@ -336,6 +335,7 @@ int getUpperbound (const WGraph &g, const pvector<WEdge> &G)
     pvector<WEdge> t = Kruskal(G, n, false);
     tmp = t[n - 2].v.w;
     tmp *= (n * n);
+    assert(tmp > 0);
     res = min(res,tmp);
     
     
@@ -350,14 +350,14 @@ pvector<pvector<WEdge> *> SpanningTreesGenerator(const WGraph &g, const pvector<
     assert(f > 0);
     double b = ((2 + eps1) * (d + 2.0) * log(n)) / (eps1 * eps1);
     int weight_cap = ceil((1.0 + eps1) * 2.0 * b);
-    int c_dash;
+    long int c_dash;
     bool lastrun = 0;
     default_random_engine gen;
     // default_random_engine gen(time(NULL));
     const double max_allowed_deviation = 1e-10;
     //Upper bound approximation for mincut value
     c_dash = getUpperbound(g, G);
-    int c_start_estimate = c_dash;
+    long int c_start_estimate = c_dash;
     //console
     cout << c_dash << ", ";
     cout << b * (1 + eps1) << ", \"";
@@ -532,7 +532,7 @@ size_t MinCut(const WGraph &g)
     t2.Stop();
 
     //console
-    cout << t.Seconds() << ", " << t2.Seconds() << '\n';
+    cout << t.Seconds() << ", " << t2.Seconds() << ", "<< res <<'\n';
     // console
 
     return res;
@@ -693,7 +693,16 @@ int main(int argc, char *argv[])
     // assert(g.directed() == true);
     //console
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
-    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, computation time, overall time\n";
+    // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, computation time, overall time, res\n";
     //console
-    BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier); 
+    // BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
+     for (NodeID u : g.vertices())
+    {
+        for (WNode wn : g.out_neigh(u))
+        {
+            assert(wn.w > 0);
+            //since g.vertices and g.out_neigh give us sorted NodeID, with u < wn.v we don't count edges twice
+            
+        }
+    }
 }
