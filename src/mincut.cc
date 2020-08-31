@@ -695,14 +695,5 @@ int main(int argc, char *argv[])
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, mincut computation time, overall time, end result vs correct result\n";
     // cout << "nodes, edges, mincut estimate, packing treshold, \"H size, p, packing time, packing value, packing size\", sample size, trees generator time, computation time, overall time, res\n";
     //console
-    // BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
-     for (NodeID u : g.vertices())
-    {
-        for (WNode wn : g.out_neigh(u))
-        {
-            assert(wn.w > 0);
-            //since g.vertices and g.out_neigh give us sorted NodeID, with u < wn.v we don't count edges twice
-            
-        }
-    }
+    BenchmarkKernel(cli, g, MinCut, PrintMinCutValue, MINCUTVerifier);
 }
